@@ -1,0 +1,49 @@
+#status-panel {
+  background: var(--panel-bg);
+  border: 1px solid rgba(255, 215, 0, 0.25);
+  border-radius: 14px;
+  padding: 14px 28px;
+  text-align: center;
+  min-width: 320px;
+}
+
+#status-text {
+  font-size: 1.25rem;
+  color: var(--gold);
+  min-height: 1.6em;
+}
+
+#bead-count {
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+  min-height: 1.2em;
+}
+
+#decade-indicators {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.decade-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #333;
+  border: 2px solid #555;
+  transition:
+    background 0.4s,
+    border-color 0.4s;
+
+  &.active {
+    background: var(--gold);
+    border-color: var(--amber);
+  }
+
+  &.done {
+    background: #888;
+    border-color: #666;
+  }
+}

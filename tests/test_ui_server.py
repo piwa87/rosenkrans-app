@@ -5,7 +5,7 @@ from rosary_state import RosaryStateMachine
 from ui.server import create_app
 
 
-def test_index_renders_language_switch():
+def test_index_serves_angular_app():
     app = create_app(RosaryStateMachine(), LanguageSettings())
 
     with app.test_client() as client:
@@ -13,8 +13,9 @@ def test_index_renders_language_switch():
 
     html = response.get_data(as_text=True)
     assert response.status_code == 200
-    assert 'id="language-select"' in html
-    assert 'value="da"' in html
+    # Angular SPA entry point: contains the custom element and the bundled script
+    assert "<app-root>" in html
+    assert "main-" in html  # hashed Angular bundle filename
 
 
 def test_language_endpoint_switches_to_danish():

@@ -1,0 +1,38 @@
+#rosary-svg {
+  max-width: min(560px, 100%);
+  filter: drop-shadow(0 2px 12px rgba(0, 0, 0, 0.6));
+}
+
+@keyframes glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px var(--gold));
+  }
+  50% {
+    filter: drop-shadow(0 0 14px var(--gold));
+  }
+}
+
+.active-bead {
+  animation: glow 1.6s ease-in-out infinite;
+}
+
+#legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-dot {
+  border-radius: 50%;
+  display: inline-block;
+}

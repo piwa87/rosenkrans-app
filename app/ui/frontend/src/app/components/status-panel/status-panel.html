@@ -1,0 +1,9 @@
+<div id="status-panel">
+  <div id="status-text">{{ statusText() }}</div>
+  <div id="bead-count">{{ beadCountText() }}</div>
+  <div id="decade-indicators">
+    @for (d of decades; track d) {
+      <div [class]="decadeClass(d)" [title]="decadeTitle(d)"></div>
+    }
+  </div>
+</div>

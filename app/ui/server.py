@@ -2,14 +2,20 @@
 
 import json
 import logging
+import os
 import time
 
-from flask import Flask, Response, jsonify, render_template, request
+from flask import Flask, Response, jsonify, request, send_from_directory
 
-from localization import LanguageSettings, SUPPORTED_LANGUAGES, UI_TRANSLATIONS
+from localization import LanguageSettings, SUPPORTED_LANGUAGES
 from rosary_state import RosaryStateMachine
 
 logger = logging.getLogger(__name__)
+
+# Path to the Angular production build output (relative to this file)
+_ANGULAR_DIST = os.path.join(
+    os.path.dirname(__file__), "frontend", "dist", "frontend", "browser"
+)
 
 
 def create_app(
@@ -19,8 +25,8 @@ def create_app(
     """Create and configure the Flask application."""
     app = Flask(
         __name__,
-        template_folder="templates",
-        static_folder="static",
+        static_folder=_ANGULAR_DIST,
+        static_url_path="/",
     )
     # Attach the shared state machine to the app object so all views can use it
     app.state_machine = state_machine  # type: ignore[attr-defined]
@@ -28,13 +34,8 @@ def create_app(
 
     @app.route("/")
     def index():
-        current_language = app.language_settings.get_language()  # type: ignore[attr-defined]
-        return render_template(
-            "index.html",
-            current_language=current_language,
-            supported_languages=SUPPORTED_LANGUAGES,
-            translations=UI_TRANSLATIONS,
-        )
+        """Serve the Angular SPA entry point."""
+        return send_from_directory(_ANGULAR_DIST, "index.html")
 
     @app.route("/state")
     def get_state():

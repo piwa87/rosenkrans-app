@@ -1,0 +1,67 @@
+<svg
+  id="rosary-svg"
+  viewBox="0 0 560 560"
+  width="560"
+  height="560"
+  role="img"
+  [attr.aria-label]="svgAriaLabel()"
+>
+  <title>{{ svgTitle() }}</title>
+
+  <!-- Chain ellipse -->
+  <ellipse
+    [attr.cx]="CX"
+    [attr.cy]="CY"
+    [attr.rx]="RX"
+    [attr.ry]="RY"
+    fill="none"
+    stroke="#5c3d1e"
+    stroke-width="2.5"
+  />
+
+  <!-- Beads -->
+  @for (bead of beads; track bead.index) {
+    <g [attr.data-bead]="bead.index" [class.active-bead]="isActive(bead)">
+      <circle
+        [attr.cx]="bead.cx"
+        [attr.cy]="bead.cy"
+        [attr.r]="beadRadius(bead)"
+        [attr.fill]="beadFill(bead)"
+        [attr.stroke]="beadStroke(bead)"
+        [attr.stroke-width]="beadStrokeWidth(bead)"
+      />
+      @if (bead.isOurFather) {
+        <text
+          [attr.x]="bead.cx"
+          [attr.y]="bead.cy + 0.5"
+          text-anchor="middle"
+          dominant-baseline="middle"
+          fill="#ddd"
+          font-size="8"
+          font-family="Arial, sans-serif"
+          pointer-events="none"
+        >{{ bead.decadeNumber }}</text>
+      }
+    </g>
+  }
+</svg>
+
+<!-- Legend -->
+<div id="legend">
+  <div class="legend-item">
+    <span class="legend-dot" style="width:18px;height:18px;background:#ffd700;"></span>
+    <span>{{ legendCurrent() }}</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-dot" style="width:18px;height:18px;background:#5c2d1e;border:2px solid #a0522d;"></span>
+    <span>{{ legendOurFather() }}</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-dot" style="width:12px;height:12px;background:#8b6914;"></span>
+    <span>{{ legendHailMary() }}</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-dot" style="width:12px;height:12px;background:#777;"></span>
+    <span>{{ legendCompleted() }}</span>
+  </div>
+</div>
