@@ -24,33 +24,118 @@ The app listens through the microphone, uses a local [Whisper](https://github.co
 - A working microphone  
 - ~150 MB disk space for the Whisper `base` model (downloaded automatically on first run)
 
-### System libraries (Linux / macOS)
+---
 
-`sounddevice` requires PortAudio:
+## Installation on macOS
+
+This section walks through every step needed to get the app running on macOS from scratch.
+
+### 1. Install Homebrew
+
+[Homebrew](https://brew.sh) is the recommended package manager for macOS.  
+Open **Terminal** and run:
 
 ```bash
-# Debian / Ubuntu
-sudo apt-get install portaudio19-dev
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
 
-# macOS (Homebrew)
+Follow the on-screen prompts. When it finishes, run the two `export` commands that the installer prints at the end (they add Homebrew to your `PATH`). Then verify:
+
+```bash
+brew --version
+```
+
+### 2. Install Python 3.9 or newer
+
+macOS ships with an older Python 2.x (or 3.x on recent releases) that is not suitable for this app. Install a fresh Python via Homebrew:
+
+```bash
+brew install python@3.12
+```
+
+Verify the installation:
+
+```bash
+python3 --version   # should print Python 3.12.x (or the version you installed)
+```
+
+> **Tip:** If you already have Python 3.9+ installed and `python3 --version` confirms it, you can skip this step.
+
+### 3. Install PortAudio
+
+The `sounddevice` audio library requires the PortAudio C library:
+
+```bash
 brew install portaudio
 ```
 
----
-
-## Installation
+### 4. Clone the repository
 
 ```bash
-# 1. Clone the repo
 git clone https://github.com/piwa87/rosenkrans-app.git
 cd rosenkrans-app
+```
 
-# 2. (Optional) create a virtual environment
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+### 5. Create a Python virtual environment
 
-# 3. Install dependencies
+Using a virtual environment keeps the project's dependencies isolated from the rest of your system:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Your prompt will change to show `(.venv)`. Every subsequent `python` / `pip` command will use this isolated environment.
+
+### 6. Install Python dependencies
+
+```bash
+pip install --upgrade pip
 pip install -r requirements.txt
+```
+
+This installs `openai-whisper`, `numpy`, `flask`, and `sounddevice`.  
+The Whisper `base` model (~150 MB) is downloaded automatically on the **first run** — not during installation.
+
+### 7. Grant microphone access
+
+macOS requires explicit permission before any app can use the microphone.
+
+1. Go to **System Settings → Privacy & Security → Microphone**.
+2. Ensure **Terminal** (or whichever terminal emulator you use, e.g. iTerm2) is toggled **on**.
+
+If you skip this step the app will start but will capture only silence, and no prayers will be detected.
+
+### 8. Run the app
+
+Make sure the virtual environment is still active (you see `(.venv)` in your prompt), then run from the **repository root**:
+
+**Console mode** — audio capture and detection with text output only:
+
+```bash
+python app/main.py
+```
+
+**Web UI mode** *(recommended)* — includes the live SVG rosary visualisation:
+
+```bash
+python app/main.py --ui
+```
+
+Then open **http://127.0.0.1:5000** in any browser.  
+The rosary SVG updates in real time: the current bead glows gold and the decade indicators fill in as decades are completed.
+
+Press **Ctrl-C** in the terminal to stop the app.
+
+---
+
+## Installation on Linux
+
+```bash
+# Debian / Ubuntu — install PortAudio
+sudo apt-get install portaudio19-dev
+
+# Then follow steps 4–8 above (clone → venv → pip install → run)
 ```
 
 ---
@@ -192,6 +277,29 @@ rosenkrans-app/
 **No audio detected**  
 Ensure the microphone is connected, system permissions are granted, and the correct input device is the system default.
 
+**macOS: Terminal does not appear in the Microphone list**  
+Open **System Settings → Privacy & Security → Microphone** and check whether your terminal app is listed. If it is not listed at all, run the app once — macOS will prompt you for permission the first time an app requests microphone access.
+
+**macOS: `brew: command not found` after installing Homebrew**  
+The installer prints two `export` commands near the end of its output. Run those lines in your terminal (or add them to `~/.zprofile`) and then open a new terminal window.
+
+**macOS: `ERROR: Could not build wheels for sounddevice` / PortAudio not found**  
+Make sure PortAudio is installed before installing the Python dependencies:
+```bash
+brew install portaudio
+pip install sounddevice
+```
+
+**macOS: `Illegal instruction: 4` or crash on Apple Silicon (M1/M2/M3)**  
+The default `openai-whisper` package may install a CPU-only version of PyTorch that is not optimised for Apple Silicon. If you see this error, install the Apple Silicon build explicitly:
+```bash
+pip install torch torchvision torchaudio
+```
+Then re-install `openai-whisper` from requirements:
+```bash
+pip install -r requirements.txt
+```
+
 **Poor recognition / wrong prayers detected**  
 Try a larger Whisper model:  `model_name="small"` in `app/main.py`.  
 You can also raise `DETECTION_THRESHOLD` in `app/detector.py` to require more anchor matches before advancing.
@@ -201,6 +309,7 @@ Install it and the app will use it automatically:
 ```bash
 pip install pyaudio
 ```
+On macOS, PyAudio also requires PortAudio (`brew install portaudio`) before it can be pip-installed.
 
 **Import errors when running `python app/main.py`**  
 Always run from the **repository root**, not from inside `app/`.
