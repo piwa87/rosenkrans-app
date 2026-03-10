@@ -1,0 +1,18 @@
+# ── Core ──────────────────────────────────────────────────────────────────────
+# Local speech-to-text (downloads model on first run, ~150 MB for 'base')
+openai-whisper>=20231117
+
+# Numerical arrays (audio processing; also required by Whisper)
+numpy>=1.24.0
+
+# Web UI
+flask>=3.0.0
+
+# ── Audio capture ─────────────────────────────────────────────────────────────
+# sounddevice is cross-platform and easier to install than PyAudio.
+# The app also supports PyAudio; install it instead if you prefer:
+#   pip install pyaudio
+sounddevice>=0.4.6
+
+# ── Development / testing ─────────────────────────────────────────────────────
+pytest>=7.4.0

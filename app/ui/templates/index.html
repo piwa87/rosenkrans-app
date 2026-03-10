@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rosary Progress Tracker</title>
+  <style>
+    :root {
+      --bg:          #1a1a2e;
+      --panel-bg:    rgba(255,255,255,0.05);
+      --gold:        #ffd700;
+      --amber:       #c8960c;
+      --bead-hm:     #8b6914;
+      --bead-of:     #5c2d1e;
+      --bead-done:   #777777;
+      --chain:       #5c3d1e;
+      --text:        #e0e0e0;
+      --text-dim:    #aaaaaa;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Georgia', 'Times New Roman', serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+      gap: 18px;
+    }
+
+    h1 {
+      color: var(--gold);
+      font-size: 1.75rem;
+      letter-spacing: 0.04em;
+      text-shadow: 0 0 18px rgba(255,215,0,0.35);
+    }
+
+    /* ── Status panel ─────────────────────────────────────────────────── */
+    #status-panel {
+      background: var(--panel-bg);
+      border: 1px solid rgba(255,215,0,0.25);
+      border-radius: 14px;
+      padding: 14px 28px;
+      text-align: center;
+      min-width: 320px;
+    }
+
+    #status-text {
+      font-size: 1.25rem;
+      color: var(--gold);
+      min-height: 1.6em;
+    }
+
+    #bead-count {
+      font-size: 0.95rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+      min-height: 1.2em;
+    }
+
+    #decade-indicators {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 10px;
+    }
+
+    .decade-dot {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: #333;
+      border: 2px solid #555;
+      transition: background 0.4s, border-color 0.4s;
+    }
+    .decade-dot.active { background: var(--gold); border-color: var(--amber); }
+    .decade-dot.done   { background: #888;         border-color: #666; }
+
+    /* ── SVG rosary ───────────────────────────────────────────────────── */
+    #rosary-svg {
+      max-width: min(560px, 100%);
+      filter: drop-shadow(0 2px 12px rgba(0,0,0,0.6));
+    }
+
+    /* Active bead glow */
+    @keyframes glow {
+      0%,100% { filter: drop-shadow(0 0  4px var(--gold)); }
+      50%      { filter: drop-shadow(0 0 14px var(--gold)); }
+    }
+    .active-bead { animation: glow 1.6s ease-in-out infinite; }
+
+    /* ── Legend ───────────────────────────────────────────────────────── */
+    #legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: center;
+      font-size: 0.82rem;
+      color: var(--text-dim);
+    }
+
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-dot  { border-radius: 50%; display: inline-block; }
+  </style>
+</head>
+<body>
+  <h1>🙏 Rosary Progress Tracker</h1>
+
+  <div id="status-panel">
+    <div id="status-text">Waiting for prayer…</div>
+    <div id="bead-count"></div>
+    <div id="decade-indicators">
+      <div class="decade-dot" id="dec-1" title="Decade 1"></div>
+      <div class="decade-dot" id="dec-2" title="Decade 2"></div>
+      <div class="decade-dot" id="dec-3" title="Decade 3"></div>
+      <div class="decade-dot" id="dec-4" title="Decade 4"></div>
+      <div class="decade-dot" id="dec-5" title="Decade 5"></div>
+    </div>
+  </div>
+
+  <svg id="rosary-svg" viewBox="0 0 560 560" width="560" height="560"
+       role="img" aria-label="Rosary bead tracker">
+    <!-- Populated by JavaScript -->
+  </svg>
+
+  <div id="legend">
+    <div class="legend-item">
+      <span class="legend-dot" style="width:18px;height:18px;background:#ffd700;"></span>
+      <span>Current bead</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot" style="width:18px;height:18px;background:#5c2d1e;border:2px solid #a0522d;"></span>
+      <span>Our Father</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot" style="width:12px;height:12px;background:#8b6914;"></span>
+      <span>Hail Mary</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot" style="width:12px;height:12px;background:#777;"></span>
+      <span>Completed</span>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    'use strict';
+
+    const SVG_NS     = 'http://www.w3.org/2000/svg';
+    const svg        = document.getElementById('rosary-svg');
+    const CX = 280, CY = 270, RX = 218, RY = 208;
+    const TOTAL      = 55;  // 5 decades × 11 beads (1 Our Father + 10 Hail Mary)
+    const DEC_SIZE   = 11;
+
+    // ── Helper: position of bead i on the oval ────────────────────────────
+    function beadPos(i) {
+      const angle = (i / TOTAL) * 2 * Math.PI - Math.PI / 2;
+      return { x: CX + RX * Math.cos(angle), y: CY + RY * Math.sin(angle) };
+    }
+
+    function isOurFather(i) { return i % DEC_SIZE === 0; }
+
+    // ── Build SVG ─────────────────────────────────────────────────────────
+    // Chain ellipse
+    const chain = document.createElementNS(SVG_NS, 'ellipse');
+    chain.setAttribute('cx', CX); chain.setAttribute('cy', CY);
+    chain.setAttribute('rx', RX); chain.setAttribute('ry', RY);
+    chain.setAttribute('fill', 'none');
+    chain.setAttribute('stroke', '#5c3d1e');
+    chain.setAttribute('stroke-width', '2.5');
+    svg.appendChild(chain);
+
+    // Title for accessibility
+    const title = document.createElementNS(SVG_NS, 'title');
+    title.textContent = 'Rosary bead progress tracker';
+    svg.insertBefore(title, svg.firstChild);
+
+    // Beads
+    const beads = [];
+    for (let i = 0; i < TOTAL; i++) {
+      const { x, y } = beadPos(i);
+      const g = document.createElementNS(SVG_NS, 'g');
+      g.setAttribute('data-bead', i);
+
+      const circle = document.createElementNS(SVG_NS, 'circle');
+      circle.setAttribute('cx', x); circle.setAttribute('cy', y);
+      const r = isOurFather(i) ? 13 : 7;
+      circle.setAttribute('r', r);
+      circle.setAttribute('fill',          isOurFather(i) ? '#5c2d1e' : '#8b6914');
+      circle.setAttribute('stroke',        '#3a2a0a');
+      circle.setAttribute('stroke-width',  '1.5');
+      g.appendChild(circle);
+
+      // Decade number label on Our Father beads
+      if (isOurFather(i)) {
+        const decNum = Math.floor(i / DEC_SIZE) + 1;
+        const lbl = document.createElementNS(SVG_NS, 'text');
+        lbl.setAttribute('x', x); lbl.setAttribute('y', y + 0.5);
+        lbl.setAttribute('text-anchor', 'middle');
+        lbl.setAttribute('dominant-baseline', 'middle');
+        lbl.setAttribute('fill', '#ddd');
+        lbl.setAttribute('font-size', '8');
+        lbl.setAttribute('font-family', 'Arial, sans-serif');
+        lbl.setAttribute('pointer-events', 'none');
+        lbl.textContent = decNum;
+        g.appendChild(lbl);
+      }
+
+      svg.appendChild(g);
+      beads.push({ g, circle, x, y, baseR: r });
+    }
+
+    // ── State rendering ───────────────────────────────────────────────────
+    function activeIndex(decade, bead) {
+      return decade > 0 ? (decade - 1) * DEC_SIZE + bead : -1;
+    }
+
+    function updateBeads(state) {
+      const completed = state.completed_decades || [];
+
+      // 1. Reset all beads to their default appearance
+      for (let i = 0; i < TOTAL; i++) {
+        const { circle, baseR } = beads[i];
+        beads[i].g.classList.remove('active-bead');
+        circle.setAttribute('r',            baseR);
+        circle.setAttribute('fill',         isOurFather(i) ? '#5c2d1e' : '#8b6914');
+        circle.setAttribute('stroke',       '#3a2a0a');
+        circle.setAttribute('stroke-width', '1.5');
+      }
+
+      // 2. Grey out completed decades
+      for (const dec of completed) {
+        const start = (dec - 1) * DEC_SIZE;
+        for (let b = 0; b < DEC_SIZE; b++) {
+          const idx = start + b;
+          if (idx < TOTAL) {
+            beads[idx].circle.setAttribute('fill',   '#777');
+            beads[idx].circle.setAttribute('stroke', '#555');
+          }
+        }
+      }
+
+      // 3. Highlight the active bead
+      const ai = activeIndex(state.decade, state.bead);
+      if (ai >= 0 && ai < TOTAL) {
+        const { g, circle } = beads[ai];
+        circle.setAttribute('fill',         '#ffd700');
+        circle.setAttribute('stroke',       '#c8960c');
+        circle.setAttribute('stroke-width', '3');
+        circle.setAttribute('r',            isOurFather(ai) ? 17 : 11);
+        g.classList.add('active-bead');
+      }
+
+      // 4. Update status panel
+      const STATUS = {
+        IDLE:       '🙏 Waiting for prayer…',
+        OUR_FATHER: `✝️  Decade ${state.decade} — Our Father`,
+        HAIL_MARY:  `📿 Decade ${state.decade} — Hail Mary ${state.bead} / 10`,
+        GLORY_BE:   `✨ Decade ${state.decade} — Glory Be ✓`,
+        COMPLETE:   '🎉 Rosary Complete! God bless you.',
+      };
+      document.getElementById('status-text').textContent =
+        STATUS[state.state] || state.state;
+
+      document.getElementById('bead-count').textContent =
+        state.state === 'HAIL_MARY' ? `Bead ${state.bead} of 10` : '';
+
+      // 5. Update decade indicators
+      for (let d = 1; d <= 5; d++) {
+        const el = document.getElementById('dec-' + d);
+        el.className = 'decade-dot';
+        if (completed.includes(d))     el.classList.add('done');
+        else if (d === state.decade)   el.classList.add('active');
+      }
+    }
+
+    // ── SSE connection ────────────────────────────────────────────────────
+    function connect() {
+      const es = new EventSource('/stream');
+      es.onmessage = function (e) {
+        try { updateBeads(JSON.parse(e.data)); }
+        catch (err) { console.error('Parse error:', err); }
+      };
+      es.onerror = function () {
+        console.log('SSE disconnected — retrying in 2 s…');
+        es.close();
+        setTimeout(connect, 2000);
+      };
+    }
+    connect();
+
+    // Initial load (before SSE delivers first event)
+    fetch('/state').then(r => r.json()).then(updateBeads).catch(console.error);
+  })();
+  </script>
+</body>
+</html>
