@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from threading import Lock
-from typing import Dict
+from typing import Dict, Optional
 
 DEFAULT_LANGUAGE = "en"
 
@@ -51,7 +51,7 @@ UI_TRANSLATIONS = {
 }
 
 
-def normalize_language(language: str | None) -> str:
+def normalize_language(language: Optional[str]) -> str:
     """Return a supported language code, falling back to English."""
     if language in SUPPORTED_LANGUAGES:
         return language

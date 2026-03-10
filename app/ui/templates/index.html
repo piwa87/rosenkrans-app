@@ -200,7 +200,8 @@
     const DEC_SIZE   = 11;
 
     function t(key, values) {
-      let text = I18N[currentLanguage][key];
+      const languagePack = I18N[currentLanguage] || {};
+      let text = languagePack[key] || key;
       if (!values) return text;
       for (const [name, value] of Object.entries(values)) {
         text = text.replace(`{${name}}`, value);
@@ -359,7 +360,7 @@
       })
         .then(r => {
           if (!r.ok) {
-            throw new Error('Could not switch language');
+            throw new Error(`Could not switch language (HTTP ${r.status})`);
           }
           return r.json();
         })
