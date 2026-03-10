@@ -20,6 +20,16 @@ def test_detect_hail_mary(det):
     assert det.detect("Hail Mary full of grace the Lord is with thee") == PrayerType.HAIL_MARY
 
 
+def test_detect_hail_mary_danish(det):
+    text = "Hil dig Maria fuld af nåde Herren er med dig"
+    assert det.detect(text, language="da") == PrayerType.HAIL_MARY
+
+
+def test_detect_glory_be_danish_without_diacritics(det):
+    text = "Aere vaere Faderen og Sonnen og Helliganden"
+    assert det.detect(text, language="da") == PrayerType.GLORY_BE
+
+
 def test_detect_hail_mary_partial_phrase(det):
     assert det.detect("blessed art thou among women") == PrayerType.HAIL_MARY
 
@@ -142,3 +152,8 @@ def test_score_transcript_empty(det):
 def test_score_transcript_counts_anchors(det):
     scores = det._score_transcript("hail mary full of grace the lord is with thee")
     assert scores.get(PrayerType.HAIL_MARY, 0) >= 3
+
+
+def test_score_transcript_unsupported_language_falls_back_to_english(det):
+    scores = det._score_transcript("hail mary full of grace", language="de")
+    assert scores.get(PrayerType.HAIL_MARY, 0) >= 2

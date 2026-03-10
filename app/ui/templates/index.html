@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ current_language }}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rosary Progress Tracker</title>
+  <title>{{ translations[current_language]["page_title"] }}</title>
   <style>
     :root {
       --bg:          #1a1a2e;
@@ -37,6 +37,32 @@
       font-size: 1.75rem;
       letter-spacing: 0.04em;
       text-shadow: 0 0 18px rgba(255,215,0,0.35);
+    }
+
+    #top-bar {
+      width: min(560px, 100%);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #language-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-dim);
+      font-size: 0.95rem;
+    }
+
+    #language-select {
+      background: var(--panel-bg);
+      border: 1px solid rgba(255,215,0,0.25);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 6px 10px;
+      font: inherit;
     }
 
     /* ── Status panel ─────────────────────────────────────────────────── */
@@ -107,41 +133,51 @@
   </style>
 </head>
 <body>
-  <h1>🙏 Rosary Progress Tracker</h1>
+  <div id="top-bar">
+    <h1 id="page-title">{{ translations[current_language]["title"] }}</h1>
+    <div id="language-controls">
+      <label for="language-select" id="language-label">{{ translations[current_language]["language_label"] }}</label>
+      <select id="language-select" aria-label="{{ translations[current_language]['language_label'] }}">
+        {% for code, label in supported_languages.items() %}
+        <option value="{{ code }}"{% if code == current_language %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
 
   <div id="status-panel">
-    <div id="status-text">Waiting for prayer…</div>
+    <div id="status-text">{{ translations[current_language]["waiting"] }}</div>
     <div id="bead-count"></div>
     <div id="decade-indicators">
-      <div class="decade-dot" id="dec-1" title="Decade 1"></div>
-      <div class="decade-dot" id="dec-2" title="Decade 2"></div>
-      <div class="decade-dot" id="dec-3" title="Decade 3"></div>
-      <div class="decade-dot" id="dec-4" title="Decade 4"></div>
-      <div class="decade-dot" id="dec-5" title="Decade 5"></div>
+      <div class="decade-dot" id="dec-1" title="{{ translations[current_language]['decade'].format(number=1) }}"></div>
+      <div class="decade-dot" id="dec-2" title="{{ translations[current_language]['decade'].format(number=2) }}"></div>
+      <div class="decade-dot" id="dec-3" title="{{ translations[current_language]['decade'].format(number=3) }}"></div>
+      <div class="decade-dot" id="dec-4" title="{{ translations[current_language]['decade'].format(number=4) }}"></div>
+      <div class="decade-dot" id="dec-5" title="{{ translations[current_language]['decade'].format(number=5) }}"></div>
     </div>
   </div>
 
   <svg id="rosary-svg" viewBox="0 0 560 560" width="560" height="560"
-       role="img" aria-label="Rosary bead tracker">
+       role="img" aria-label="{{ translations[current_language]['svg_label'] }}">
     <!-- Populated by JavaScript -->
   </svg>
 
   <div id="legend">
     <div class="legend-item">
       <span class="legend-dot" style="width:18px;height:18px;background:#ffd700;"></span>
-      <span>Current bead</span>
+      <span id="legend-current">{{ translations[current_language]["current_bead"] }}</span>
     </div>
     <div class="legend-item">
       <span class="legend-dot" style="width:18px;height:18px;background:#5c2d1e;border:2px solid #a0522d;"></span>
-      <span>Our Father</span>
+      <span id="legend-our-father">{{ translations[current_language]["our_father"] }}</span>
     </div>
     <div class="legend-item">
       <span class="legend-dot" style="width:12px;height:12px;background:#8b6914;"></span>
-      <span>Hail Mary</span>
+      <span id="legend-hail-mary">{{ translations[current_language]["hail_mary"] }}</span>
     </div>
     <div class="legend-item">
       <span class="legend-dot" style="width:12px;height:12px;background:#777;"></span>
-      <span>Completed</span>
+      <span id="legend-completed">{{ translations[current_language]["completed"] }}</span>
     </div>
   </div>
 
@@ -149,11 +185,29 @@
   (function () {
     'use strict';
 
+    const I18N       = {{ translations|tojson }};
+    let currentLanguage = {{ current_language|tojson }};
+    let currentState = null;
     const SVG_NS     = 'http://www.w3.org/2000/svg';
     const svg        = document.getElementById('rosary-svg');
+    const pageTitle  = document.getElementById('page-title');
+    const statusText = document.getElementById('status-text');
+    const beadCount  = document.getElementById('bead-count');
+    const languageLabel = document.getElementById('language-label');
+    const languageSelect = document.getElementById('language-select');
     const CX = 280, CY = 270, RX = 218, RY = 208;
     const TOTAL      = 55;  // 5 decades × 11 beads (1 Our Father + 10 Hail Mary)
     const DEC_SIZE   = 11;
+
+    function t(key, values) {
+      const languagePack = I18N[currentLanguage] || {};
+      let text = languagePack[key] || key;
+      if (!values) return text;
+      for (const [name, value] of Object.entries(values)) {
+        text = text.replace(`{${name}}`, value);
+      }
+      return text;
+    }
 
     // ── Helper: position of bead i on the oval ────────────────────────────
     function beadPos(i) {
@@ -175,7 +229,7 @@
 
     // Title for accessibility
     const title = document.createElementNS(SVG_NS, 'title');
-    title.textContent = 'Rosary bead progress tracker';
+    title.textContent = t('svg_title');
     svg.insertBefore(title, svg.firstChild);
 
     // Beads
@@ -213,12 +267,34 @@
       beads.push({ g, circle, x, y, baseR: r });
     }
 
+    function applyTranslations() {
+      document.documentElement.lang = currentLanguage;
+      document.title = t('page_title');
+      pageTitle.textContent = t('title');
+      languageLabel.textContent = t('language_label');
+      languageSelect.setAttribute('aria-label', t('language_label'));
+      svg.setAttribute('aria-label', t('svg_label'));
+      title.textContent = t('svg_title');
+      document.getElementById('legend-current').textContent = t('current_bead');
+      document.getElementById('legend-our-father').textContent = t('our_father');
+      document.getElementById('legend-hail-mary').textContent = t('hail_mary');
+      document.getElementById('legend-completed').textContent = t('completed');
+      for (let d = 1; d <= 5; d++) {
+        document.getElementById('dec-' + d).title = t('decade', { number: d });
+      }
+      if (currentState === null) {
+        statusText.textContent = t('waiting');
+        beadCount.textContent = '';
+      }
+    }
+
     // ── State rendering ───────────────────────────────────────────────────
     function activeIndex(decade, bead) {
       return decade > 0 ? (decade - 1) * DEC_SIZE + bead : -1;
     }
 
     function updateBeads(state) {
+      currentState = state;
       const completed = state.completed_decades || [];
 
       // 1. Reset all beads to their default appearance
@@ -256,17 +332,16 @@
 
       // 4. Update status panel
       const STATUS = {
-        IDLE:       '🙏 Waiting for prayer…',
-        OUR_FATHER: `✝️  Decade ${state.decade} — Our Father`,
-        HAIL_MARY:  `📿 Decade ${state.decade} — Hail Mary ${state.bead} / 10`,
-        GLORY_BE:   `✨ Decade ${state.decade} — Glory Be ✓`,
-        COMPLETE:   '🎉 Rosary Complete! God bless you.',
+        IDLE:       t('waiting'),
+        OUR_FATHER: t('status_our_father', { decade: state.decade }),
+        HAIL_MARY:  t('status_hail_mary', { decade: state.decade, bead: state.bead }),
+        GLORY_BE:   t('status_glory_be', { decade: state.decade }),
+        COMPLETE:   t('status_complete'),
       };
-      document.getElementById('status-text').textContent =
-        STATUS[state.state] || state.state;
+      statusText.textContent = STATUS[state.state] || state.state;
 
-      document.getElementById('bead-count').textContent =
-        state.state === 'HAIL_MARY' ? `Bead ${state.bead} of 10` : '';
+      beadCount.textContent =
+        state.state === 'HAIL_MARY' ? t('bead_count', { bead: state.bead }) : '';
 
       // 5. Update decade indicators
       for (let d = 1; d <= 5; d++) {
@@ -276,6 +351,37 @@
         else if (d === state.decade)   el.classList.add('active');
       }
     }
+
+    function updateLanguage(nextLanguage) {
+      fetch('/language', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: nextLanguage }),
+      })
+        .then(r => {
+          if (!r.ok) {
+            throw new Error(`Could not switch language (HTTP ${r.status})`);
+          }
+          return r.json();
+        })
+        .then(data => {
+          currentLanguage = data.language;
+          applyTranslations();
+          if (currentState !== null) {
+            updateBeads(currentState);
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          languageSelect.value = currentLanguage;
+        });
+    }
+
+    languageSelect.addEventListener('change', function () {
+      updateLanguage(languageSelect.value);
+    });
+
+    applyTranslations();
 
     // ── SSE connection ────────────────────────────────────────────────────
     function connect() {
