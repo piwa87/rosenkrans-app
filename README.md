@@ -14,6 +14,7 @@ The app listens through the microphone, uses a local [Whisper](https://github.co
 | Smart detection | Anchor-phrase matching with cooldown/debounce (handles accents & pauses) |
 | State machine | Tracks Our Father → 10 × Hail Mary → Glory Be across all 5 decades |
 | Web UI | SVG rosary with the current bead highlighted, updating in real time |
+| Languages | English and Danish, with a live language switch in the web UI |
 | Console mode | Text logs showing transcript, detected prayer, decade, and bead index |
 
 ---
@@ -124,6 +125,7 @@ python app/main.py --ui
 
 Then open **http://127.0.0.1:5000** in any browser.  
 The rosary SVG updates in real time: the current bead glows gold and the decade indicators fill in as decades are completed.
+Use the language selector in the page header to switch between English and Danish for both the UI and prayer detection.
 
 Press **Ctrl-C** in the terminal to stop the app.
 
@@ -156,6 +158,7 @@ python app/main.py --ui
 
 Then open **http://127.0.0.1:5000** in a browser.  
 The rosary SVG updates in real time: the current bead glows gold and the decade indicators fill in as decades are completed.
+Use the language selector in the page header to switch languages while the app is running.
 
 ---
 
@@ -185,10 +188,10 @@ The detector looks for **anchor phrases** — key words unique to each prayer �
 
 | Prayer | Example anchors |
 |--------|-----------------|
-| Our Father | `"our father"`, `"thy will be done"`, `"daily bread"` |
-| Hail Mary | `"hail mary"`, `"full of grace"`, `"blessed art thou among women"` |
-| Glory Be | `"glory be"`, `"world without end"`, `"as it was in the beginning"` |
-| Fatima prayer | `"o my jesus"`, `"forgive us our sins"` |
+| Our Father | `"our father"`, `"thy will be done"`, `"daily bread"` / `"fader vor"`, `"ske din vilje"` |
+| Hail Mary | `"hail mary"`, `"full of grace"`, `"blessed art thou among women"` / `"hil dig maria"`, `"fuld af nåde"` |
+| Glory Be | `"glory be"`, `"world without end"`, `"as it was in the beginning"` / `"ære være faderen"`, `"som det var i begyndelsen"` |
+| Fatima prayer | `"o my jesus"`, `"forgive us our sins"` / `"o min jesus"`, `"tilgiv os vore synder"` |
 
 A **cooldown** (default 15 s) prevents the same prayer from being counted multiple times from consecutive audio chunks while you are still reciting it.
 
@@ -229,6 +232,8 @@ Edit `app/main.py`:
 | `CHUNK_SECONDS` | `5` | Duration of each audio chunk sent to Whisper |
 | `model_name` | `"base"` | Whisper model size (`tiny` / `base` / `small` / `medium` / `large`) |
 | `language` | `"en"` | Language code for speech recognition |
+
+When the web UI is enabled, the page language selector updates this live between `"en"` and `"da"`.
 
 Edit `app/detector.py`:
 

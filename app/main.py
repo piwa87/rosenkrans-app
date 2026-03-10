@@ -19,6 +19,7 @@ import threading
 import numpy as np
 
 from detector import PrayerDetector
+from localization import LanguageSettings
 from rosary_state import RosaryState, RosaryStateMachine
 from stt_whisper import WhisperSTT
 
@@ -130,6 +131,7 @@ def process_loop(
     detector: PrayerDetector,
     sm: RosaryStateMachine,
     on_state_update=None,
+    language_getter=None,
 ) -> None:
     """
     Main loop: continuously capture audio, transcribe, detect the prayer,
@@ -147,13 +149,15 @@ def process_loop(
     logger.info("Press Ctrl-C to stop.")
 
     for audio_chunk in get_audio_stream(CHUNK_SAMPLES, SAMPLE_RATE):
+        if language_getter is not None:
+            stt.language = language_getter()
         transcript = stt.transcribe(audio_chunk, SAMPLE_RATE)
         if not transcript:
             continue
 
         logger.info("Transcript: %r", transcript)
 
-        prayer = detector.detect(transcript)
+        prayer = detector.detect(transcript, language=stt.language)
         if prayer is None:
             continue
 
@@ -177,16 +181,17 @@ def process_loop(
 
 def main() -> None:
     use_ui = "--ui" in sys.argv
+    language_settings = LanguageSettings()
 
     logger.info("=== Rosary Progress Tracker ===")
 
-    stt = WhisperSTT(model_name="base", language="en")
+    stt = WhisperSTT(model_name="base", language=language_settings.get_language())
     detector = PrayerDetector()
 
     if use_ui:
         from ui.server import create_app, start_ui  # type: ignore[import]
 
-        app = create_app(state_machine)
+        app = create_app(state_machine, language_settings)
 
         ui_thread = threading.Thread(
             target=start_ui, args=(app,), daemon=True, name="flask-ui"
@@ -195,7 +200,12 @@ def main() -> None:
         logger.info("Web UI available at http://127.0.0.1:5000")
 
     try:
-        process_loop(stt, detector, state_machine)
+        process_loop(
+            stt,
+            detector,
+            state_machine,
+            language_getter=language_settings.get_language,
+        )
     except KeyboardInterrupt:
         logger.info("Stopped by user.")
 
