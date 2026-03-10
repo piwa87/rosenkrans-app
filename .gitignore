@@ -12,7 +12,7 @@ env/
 
 # Distribution / packaging
 *.egg-info/
-dist/
+/dist
 build/
 
 # Pytest

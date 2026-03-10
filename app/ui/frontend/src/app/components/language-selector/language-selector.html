@@ -1,0 +1,13 @@
+<div id="language-controls">
+  <label for="language-select">{{ label() }}</label>
+  <select
+    id="language-select"
+    [attr.aria-label]="label()"
+    [ngModel]="language()"
+    (ngModelChange)="onLanguageChange($event)"
+  >
+    @for (entry of supportedLanguages; track entry[0]) {
+      <option [value]="entry[0]">{{ entry[1] }}</option>
+    }
+  </select>
+</div>
