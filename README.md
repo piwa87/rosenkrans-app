@@ -23,7 +23,7 @@ The app listens through the microphone, uses a local [Whisper](https://github.co
 
 - Python 3.9 or newer  
 - A working microphone  
-- ~150 MB disk space for the Whisper `base` model (downloaded automatically on first run)
+- ~460 MB disk space for the Whisper `small` model (downloaded automatically on first run)
 
 ---
 
@@ -96,7 +96,7 @@ pip install -r requirements.txt
 ```
 
 This installs `openai-whisper`, `numpy`, `flask`, and `sounddevice`.  
-The Whisper `base` model (~150 MB) is downloaded automatically on the **first run** — not during installation.
+The Whisper `small` model (~460 MB) is downloaded automatically on the **first run** — not during installation.
 
 ### 7. Grant microphone access
 
@@ -126,6 +126,12 @@ python app/main.py --ui
 Then open **http://127.0.0.1:5000** in any browser.  
 The rosary SVG updates in real time: the current bead glows gold and the decade indicators fill in as decades are completed.
 Use the language selector in the page header to switch between English and Danish for both the UI and prayer detection.
+
+For even better recognition (recommended for Danish), use the `medium` model:
+
+```bash
+python app/main.py --model medium --ui
+```
 
 Press **Ctrl-C** in the terminal to stop the app.
 
@@ -230,7 +236,7 @@ Edit `app/main.py`:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `CHUNK_SECONDS` | `5` | Duration of each audio chunk sent to Whisper |
-| `model_name` | `"base"` | Whisper model size (`tiny` / `base` / `small` / `medium` / `large`) |
+| `--model` | `"small"` | Whisper model size (`tiny` / `base` / `small` / `medium` / `large`). Pass as a CLI flag: `python app/main.py --model medium` |
 | `language` | `"en"` | Language code for speech recognition |
 
 When the web UI is enabled, the page language selector updates this live between `"en"` and `"da"`.
@@ -306,7 +312,11 @@ pip install -r requirements.txt
 ```
 
 **Poor recognition / wrong prayers detected**  
-Try a larger Whisper model:  `model_name="small"` in `app/main.py`.  
+Try the `medium` Whisper model for the best accuracy, especially for Danish:
+```bash
+python app/main.py --model medium --ui
+```
+Available sizes (in ascending accuracy/resource order): `tiny`, `base`, `small` *(default)*, `medium`, `large`.  
 You can also raise `DETECTION_THRESHOLD` in `app/detector.py` to require more anchor matches before advancing.
 
 **`pyaudio` preferred over `sounddevice`**  
