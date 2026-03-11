@@ -12,8 +12,8 @@ With web UI (open http://127.0.0.1:5000 in a browser):
     python app/main.py --ui
 """
 
+import argparse
 import logging
-import sys
 import threading
 
 import numpy as np
@@ -180,15 +180,30 @@ def process_loop(
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    use_ui = "--ui" in sys.argv
+    parser = argparse.ArgumentParser(description="Rosary Progress Tracker")
+    parser.add_argument("--ui", action="store_true", help="Start the web UI")
+    parser.add_argument(
+        "--model",
+        default="small",
+        choices=["tiny", "base", "small", "medium", "large", "large-v2", "large-v3"],
+        help=(
+            "Whisper model size to use for speech recognition "
+            "(default: small — a good balance of accuracy and speed). "
+            "Use 'medium' or 'large' for the best Danish recognition accuracy "
+            "at the cost of higher RAM usage and slower transcription."
+        ),
+    )
+    args = parser.parse_args()
+
     language_settings = LanguageSettings()
 
     logger.info("=== Rosary Progress Tracker ===")
+    logger.info("Whisper model: %s", args.model)
 
-    stt = WhisperSTT(model_name="base", language=language_settings.get_language())
+    stt = WhisperSTT(model_name=args.model, language=language_settings.get_language())
     detector = PrayerDetector()
 
-    if use_ui:
+    if args.ui:
         from ui.server import create_app, start_ui  # type: ignore[import]
 
         app = create_app(state_machine, language_settings)

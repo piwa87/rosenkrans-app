@@ -7,6 +7,22 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Language-specific initial prompts
+# ---------------------------------------------------------------------------
+# Providing a short prayer-vocabulary prompt lets Whisper calibrate its
+# language model to the expected domain (Catholic prayers) and character set
+# (including Danish diacritics æ, ø, å).  This significantly improves
+# recognition accuracy for non-English languages like Danish.
+_INITIAL_PROMPTS: dict[str, str] = {
+    "da": (
+        "Fadervor, som er i himlene, helliget vorde dit navn, komme dit rige, ske din vilje. "
+        "Hil dig Maria, fuld af nåde, Herren er med dig. "
+        "Hellige Maria, Guds Moder, bed for os syndere nu og i vor dødstime. Amen. "
+        "Ære være Faderen og Sønnen og Helligånden, i al evighed. Amen."
+    ),
+}
+
 
 class WhisperSTT:
     """
@@ -16,7 +32,7 @@ class WhisperSTT:
     file is only downloaded/cached once.
     """
 
-    def __init__(self, model_name: str = "base", language: str = "en") -> None:
+    def __init__(self, model_name: str = "small", language: str = "en") -> None:
         self.model_name = model_name
         self.language = language
         self._model = None
@@ -58,12 +74,27 @@ class WhisperSTT:
             return ""
 
         try:
-            result = model.transcribe(
-                audio_f32,
-                language=self.language,
-                fp16=False,
-                verbose=False,
-            )
+            transcribe_kwargs: dict = {
+                "language": self.language,
+                "fp16": False,
+                "verbose": False,
+                # Beam search gives more accurate transcripts than greedy
+                # decoding, which is especially beneficial for non-English
+                # languages such as Danish.
+                "beam_size": 5,
+                # Deterministic output: try only temperature=0 (no fallback
+                # to higher temperatures).  Reduces hallucinations for short
+                # prayer chunks.
+                "temperature": 0.0,
+                # Do not feed previous chunk text as a prompt for the next
+                # chunk; avoids error propagation across chunk boundaries.
+                "condition_on_previous_text": False,
+            }
+            initial_prompt = _INITIAL_PROMPTS.get(self.language)
+            if initial_prompt:
+                transcribe_kwargs["initial_prompt"] = initial_prompt
+
+            result = model.transcribe(audio_f32, **transcribe_kwargs)
             text: str = result.get("text", "").strip()
             logger.debug("Transcript: %r", text)
             return text
