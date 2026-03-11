@@ -16,7 +16,11 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 def _normalize_text(text: str) -> str:
     normalized = unicodedata.normalize("NFKD", text.casefold())
-    return "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    # NFKD decomposes å into 'a' + combining ring above; stripping combining
+    # characters gives 'a'.  æ and ø have no NFKD decomposition, so they are
+    # mapped explicitly to their ASCII equivalents used in the anchor phrases.
+    stripped = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    return stripped.replace("æ", "ae").replace("ø", "o")
 
 
 _RAW_PRAYER_ANCHORS: Dict[str, Dict[PrayerType, list[str]]] = {
@@ -65,6 +69,7 @@ _RAW_PRAYER_ANCHORS: Dict[str, Dict[PrayerType, list[str]]] = {
     "da": {
         PrayerType.OUR_FATHER: [
             "fader vor",
+            "fadervor",
             "du som er i himlene",
             "helliget vorde dit navn",
             "komme dit rige",
@@ -74,12 +79,14 @@ _RAW_PRAYER_ANCHORS: Dict[str, Dict[PrayerType, list[str]]] = {
             "som ogsa vi forlader vore skyldnere",
             "led os ikke i fristelse",
             "fri os fra det onde",
+            "pa jorden",
         ],
         PrayerType.HAIL_MARY: [
             "hil dig maria",
             "fuld af nade",
             "herren er med dig",
             "velsignet er du blandt kvinder",
+            "velsignet er du iblandt kvinder",
             "velsignet er dit livs frugt",
             "hellige maria",
             "guds moder",

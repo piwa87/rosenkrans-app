@@ -30,6 +30,38 @@ def test_detect_glory_be_danish_without_diacritics(det):
     assert det.detect(text, language="da") == PrayerType.GLORY_BE
 
 
+# ── Danish diacritics (Whisper outputs proper æ / ø / å) ─────────────────────
+
+def test_detect_glory_be_danish_with_ae_diacritics(det):
+    # Whisper correctly outputs "Ære være Faderen" with æ characters.
+    text = "Ære være Faderen og Sønnen og Helligånden"
+    assert det.detect(text, language="da") == PrayerType.GLORY_BE
+
+
+def test_detect_our_father_danish_brod_with_o_diacritic(det):
+    # "brød" contains ø; normalization must map ø→o so the anchor matches.
+    text = "giv os i dag vort daglige brød og forlad os vor skyld"
+    assert det.detect(text, language="da") == PrayerType.OUR_FATHER
+
+
+def test_detect_our_father_danish_fadervor_single_word(det):
+    # Modern Danish writes "Fadervor" as one word.
+    text = "Fadervor du som er i himlene helliget vorde dit navn"
+    assert det.detect(text, language="da") == PrayerType.OUR_FATHER
+
+
+def test_detect_hail_mary_danish_dodstime_with_o_diacritic(det):
+    # "dødstime" contains ø; normalization must map ø→o so the anchor matches.
+    text = "bed for os syndere nu og i vor dødstime"
+    assert det.detect(text, language="da") == PrayerType.HAIL_MARY
+
+
+def test_detect_fatima_danish_sjaele_with_ae_diacritic(det):
+    # "sjæle" contains æ; normalization must map æ→ae so the anchor matches.
+    text = "O min Jesus frels os fra helvedes ild for alle sjæle til himlen"
+    assert det.detect(text, language="da") == PrayerType.FATIMA
+
+
 def test_detect_hail_mary_partial_phrase(det):
     assert det.detect("blessed art thou among women") == PrayerType.HAIL_MARY
 
