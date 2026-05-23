@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rosary Progress Tracker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1a1a2e;
+      color: #e0e0e0;
+      font-family: Georgia, "Times New Roman", serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 16px 32px;
+      gap: 14px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    header {
+      width: 100%;
+      max-width: 580px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    #page-title {
+      font-size: 1.35rem;
+      color: #c8a45a;
+      letter-spacing: 0.01em;
+    }
+
+    .lang-group { display: flex; gap: 6px; }
+
+    .lang-btn {
+      background: transparent;
+      border: 1px solid #444;
+      color: #aaa;
+      padding: 4px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-family: inherit;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .lang-btn.active  { border-color: #c8a45a; color: #c8a45a; }
+    .lang-btn:hover:not(.active) { border-color: #777; color: #ccc; }
+
+    /* ── SVG ────────────────────────────────────────────────────── */
+    #rosary-container { width: 100%; max-width: 560px; }
+    #rosary-svg       { width: 100%; height: auto; display: block; }
+
+    /* ── Legend ─────────────────────────────────────────────────── */
+    #legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px 18px;
+      font-size: 0.82rem;
+      color: #999;
+    }
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+    .legend-dot  { display: inline-block; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Status panel ───────────────────────────────────────────── */
+    .panel {
+      width: 100%;
+      max-width: 580px;
+      background: #16213e;
+      border: 1px solid #2a3a5e;
+      border-radius: 10px;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #status-text {
+      font-size: 1.1rem;
+      text-align: center;
+      min-height: 1.5em;
+      color: #ddd;
+    }
+
+    /* ── Transcript ─────────────────────────────────────────────── */
+    #transcript-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 1.3em;
+    }
+    #transcript-label {
+      font-size: 0.78rem;
+      color: #555;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    #transcript-text {
+      font-size: 0.82rem;
+      color: #7a8fa8;
+      font-style: italic;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ── Decade dots ────────────────────────────────────────────── */
+    .decade-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+    .decade-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #252535;
+      border: 2px solid #3a3a55;
+      transition: background 0.3s, border-color 0.3s;
+    }
+    .decade-dot.current  { background: #8b5e10; border-color: #c8a45a; }
+    .decade-dot.complete { background: #555;    border-color: #444; }
+
+    /* ── Controls ───────────────────────────────────────────────── */
+    .controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .ctrl-btn {
+      background: #0f3460;
+      color: #d0d8e8;
+      border: 1px solid #1e4d8c;
+      border-radius: 6px;
+      padding: 8px 20px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s;
+      min-width: 100px;
+    }
+    .ctrl-btn:hover  { background: #184880; }
+    .ctrl-btn:active { background: #2060a0; }
+
+    .ctrl-btn.danger        { background: #3a1010; border-color: #6a2020; }
+    .ctrl-btn.danger:hover  { background: #5a1818; }
+    .ctrl-btn.danger:active { background: #7a2020; }
+
+    /* ── Connection indicator ───────────────────────────────────── */
+    #conn-status {
+      position: fixed;
+      bottom: 8px;
+      right: 12px;
+      font-size: 0.72rem;
+      color: #444;
+      transition: color 0.3s;
+    }
+    #conn-status.connected    { color: #2e8b57; }
+    #conn-status.disconnected { color: #a03030; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1 id="page-title">Rosary Progress Tracker</h1>
+  <div class="lang-group">
+    <button class="lang-btn active" id="btn-en" onclick="setLanguage('en')">English</button>
+    <button class="lang-btn"        id="btn-da" onclick="setLanguage('da')">Dansk</button>
+  </div>
+</header>
+
+<!-- SVG rosary -->
+<div id="rosary-container">
+  <svg id="rosary-svg" viewBox="0 0 560 560" role="img" aria-label="Rosary bead tracker">
+    <title>Rosary bead progress</title>
+    <ellipse cx="280" cy="270" rx="218" ry="208" fill="none" stroke="#5c3d1e" stroke-width="2.5"/>
+    <g id="beads-group"></g>
+  </svg>
+</div>
+
+<!-- Legend -->
+<div id="legend">
+  <div class="legend-item">
+    <span class="legend-dot" style="width:18px;height:18px;background:#ffd700;"></span>
+    <span id="legend-current">Current bead</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-dot" style="width:18px;height:18px;background:#5c2d1e;border:2px solid #a0522d;"></span>
+    <span id="legend-our-father">Our Father</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-dot" style="width:12px;height:12px;background:#8b6914;"></span>
+    <span id="legend-hail-mary">Hail Mary</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-dot" style="width:12px;height:12px;background:#555;"></span>
+    <span id="legend-completed">Completed</span>
+  </div>
+</div>
+
+<!-- Status panel -->
+<div class="panel">
+  <div id="status-text">🙏 Waiting for prayer…</div>
+
+  <div id="transcript-row">
+    <span id="transcript-label">Heard:</span>
+    <span id="transcript-text"></span>
+  </div>
+
+  <div class="decade-row">
+    <div class="decade-dot" id="dec-1" title="Decade 1"></div>
+    <div class="decade-dot" id="dec-2" title="Decade 2"></div>
+    <div class="decade-dot" id="dec-3" title="Decade 3"></div>
+    <div class="decade-dot" id="dec-4" title="Decade 4"></div>
+    <div class="decade-dot" id="dec-5" title="Decade 5"></div>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl-btn"        id="btn-advance" onclick="advanceManual()">Next Bead</button>
+    <button class="ctrl-btn"        id="btn-undo"    onclick="undo()">↩ Undo</button>
+    <button class="ctrl-btn danger" id="btn-reset"   onclick="confirmReset()">Reset</button>
+  </div>
+</div>
+
+<div id="conn-status">⬤ connecting…</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const CX = 280, CY = 270, RX = 218, RY = 208;
+const TOTAL = 55, DEC_SIZE = 11;
+
+const NS = 'http://www.w3.org/2000/svg';
+
+// ── State ──────────────────────────────────────────────────────────────────
+let currentLanguage = 'en';
+let currentState    = null;
+
+// ── Translations ───────────────────────────────────────────────────────────
+const TRANSLATIONS = {
+  en: {
+    page_title:       'Rosary Progress Tracker',
+    status_idle:      '🙏 Waiting for prayer…',
+    status_our_father:'✝️  Decade {decade} — Our Father',
+    status_hail_mary: '📿 Decade {decade} — Hail Mary {bead} / 10',
+    status_glory_be:  '✨ Decade {decade} — Glory Be ✓',
+    status_fatima:    '🙏 Decade {decade} — O My Jesus…',
+    status_complete:  '🎉 Rosary Complete! God bless you.',
+    legend_current:   'Current bead',
+    legend_our_father:'Our Father',
+    legend_hail_mary: 'Hail Mary',
+    legend_completed: 'Completed',
+    btn_advance:      'Next Bead',
+    btn_undo:         '↩ Undo',
+    btn_reset:        'Reset',
+    heard_label:      'Heard:',
+    confirm_reset:    'Reset the entire Rosary? This cannot be undone.',
+  },
+  da: {
+    page_title:       'Rosenkrans-fremskridt',
+    status_idle:      '🙏 Venter på bøn…',
+    status_our_father:'✝️  Dekade {decade} — Fadervor',
+    status_hail_mary: '📿 Dekade {decade} — Hil dig, Maria {bead} / 10',
+    status_glory_be:  '✨ Dekade {decade} — Ære være Faderen ✓',
+    status_fatima:    '🙏 Dekade {decade} — O min Jesus…',
+    status_complete:  '🎉 Rosenkransen er fuldført! Gud velsigne dig.',
+    legend_current:   'Nuværende perle',
+    legend_our_father:'Fadervor',
+    legend_hail_mary: 'Hil dig, Maria',
+    legend_completed: 'Fuldført',
+    btn_advance:      'Næste perle',
+    btn_undo:         '↩ Fortryd',
+    btn_reset:        'Nulstil',
+    heard_label:      'Hørt:',
+    confirm_reset:    'Nulstil hele rosenkransen? Dette kan ikke fortrydes.',
+  },
+};
+
+function t(key, vars = {}) {
+  const dict = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en;
+  let s = dict[key] || TRANSLATIONS.en[key] || key;
+  for (const [k, v] of Object.entries(vars)) {
+    s = s.replace(`{${k}}`, v);
+  }
+  return s;
+}
+
+// ── SVG bead data ──────────────────────────────────────────────────────────
+function beadPos(i) {
+  const angle = (i / TOTAL) * 2 * Math.PI - Math.PI / 2;
+  return { x: CX + RX * Math.cos(angle), y: CY + RY * Math.sin(angle) };
+}
+
+const BEADS = Array.from({ length: TOTAL }, (_, i) => {
+  const { x, y } = beadPos(i);
+  const isOF     = i % DEC_SIZE === 0;
+  return { index: i, cx: x, cy: y, r: isOF ? 13 : 7, isOurFather: isOF, decade: Math.floor(i / DEC_SIZE) + 1 };
+});
+
+function renderBeads() {
+  const g = document.getElementById('beads-group');
+  g.innerHTML = '';
+
+  BEADS.forEach(b => {
+    const grp    = document.createElementNS(NS, 'g');
+    grp.setAttribute('data-bead', b.index);
+
+    const circle = document.createElementNS(NS, 'circle');
+    circle.setAttribute('cx', b.cx);
+    circle.setAttribute('cy', b.cy);
+    circle.setAttribute('r',  b.r);
+    circle.setAttribute('fill',         b.isOurFather ? '#5c2d1e' : '#8b6914');
+    circle.setAttribute('stroke',       '#3a2a0a');
+    circle.setAttribute('stroke-width', '1.5');
+    grp.appendChild(circle);
+
+    if (b.isOurFather) {
+      const txt = document.createElementNS(NS, 'text');
+      txt.setAttribute('x',                  b.cx);
+      txt.setAttribute('y',                  b.cy + 0.5);
+      txt.setAttribute('text-anchor',        'middle');
+      txt.setAttribute('dominant-baseline',  'middle');
+      txt.setAttribute('fill',               '#ddd');
+      txt.setAttribute('font-size',          '8');
+      txt.setAttribute('font-family',        'Arial, sans-serif');
+      txt.setAttribute('pointer-events',     'none');
+      txt.textContent = b.decade;
+      grp.appendChild(txt);
+    }
+
+    g.appendChild(grp);
+  });
+}
+
+function activeBeadIndex(state) {
+  if (!state || state.decade === 0) return -1;
+  return (state.decade - 1) * DEC_SIZE + state.bead;
+}
+
+function updateBeads(state) {
+  const ai = activeBeadIndex(state);
+
+  BEADS.forEach(b => {
+    const grp    = document.querySelector(`[data-bead="${b.index}"]`);
+    if (!grp) return;
+    const circle = grp.querySelector('circle');
+    const isActive    = b.index === ai;
+    const isCompleted = state && state.completed_decades.includes(b.decade);
+
+    if (isActive) {
+      circle.setAttribute('fill',         '#ffd700');
+      circle.setAttribute('stroke',       '#c8960c');
+      circle.setAttribute('stroke-width', '3');
+      circle.setAttribute('r',            b.isOurFather ? 17 : 11);
+    } else if (isCompleted) {
+      circle.setAttribute('fill',         '#555');
+      circle.setAttribute('stroke',       '#444');
+      circle.setAttribute('stroke-width', '1.5');
+      circle.setAttribute('r',            b.r);
+    } else {
+      circle.setAttribute('fill',         b.isOurFather ? '#5c2d1e' : '#8b6914');
+      circle.setAttribute('stroke',       '#3a2a0a');
+      circle.setAttribute('stroke-width', '1.5');
+      circle.setAttribute('r',            b.r);
+    }
+  });
+}
+
+// ── Status text ────────────────────────────────────────────────────────────
+function statusText(state) {
+  if (!state) return t('status_idle');
+  switch (state.state) {
+    case 'IDLE':       return t('status_idle');
+    case 'OUR_FATHER': return t('status_our_father', { decade: state.decade });
+    case 'HAIL_MARY':  return t('status_hail_mary',  { decade: state.decade, bead: state.bead });
+    case 'GLORY_BE':   return t('status_glory_be',   { decade: state.decade });
+    case 'FATIMA':     return t('status_fatima',     { decade: state.decade });
+    case 'COMPLETE':   return t('status_complete');
+    default:           return t('status_idle');
+  }
+}
+
+function updateDecadeIndicators(state) {
+  for (let i = 1; i <= 5; i++) {
+    const dot = document.getElementById(`dec-${i}`);
+    if (!dot) continue;
+    dot.className = 'decade-dot';
+    if (state && state.completed_decades.includes(i)) {
+      dot.classList.add('complete');
+    } else if (state && state.decade === i) {
+      dot.classList.add('current');
+    }
+  }
+}
+
+// ── Translations applied to DOM ────────────────────────────────────────────
+function applyTranslations() {
+  document.title                                             = t('page_title');
+  document.getElementById('page-title').textContent         = t('page_title');
+  document.getElementById('legend-current').textContent     = t('legend_current');
+  document.getElementById('legend-our-father').textContent  = t('legend_our_father');
+  document.getElementById('legend-hail-mary').textContent   = t('legend_hail_mary');
+  document.getElementById('legend-completed').textContent   = t('legend_completed');
+  document.getElementById('btn-advance').textContent        = t('btn_advance');
+  document.getElementById('btn-undo').textContent           = t('btn_undo');
+  document.getElementById('btn-reset').textContent          = t('btn_reset');
+  document.getElementById('transcript-label').textContent   = t('heard_label');
+
+  if (currentState) {
+    document.getElementById('status-text').textContent = statusText(currentState);
+  }
+}
+
+// ── API calls ──────────────────────────────────────────────────────────────
+async function advanceManual() {
+  await fetch('/advance', { method: 'POST' });
+}
+
+async function undo() {
+  const res = await fetch('/undo', { method: 'POST' });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    if (data.error) console.info('Undo:', data.error);
+  }
+}
+
+async function confirmReset() {
+  if (!confirm(t('confirm_reset'))) return;
+  await fetch('/reset', { method: 'POST' });
+}
+
+async function setLanguage(lang) {
+  currentLanguage = lang;
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  document.getElementById('btn-da').classList.toggle('active', lang === 'da');
+  document.documentElement.lang = lang;
+  applyTranslations();
+  await fetch('/language', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ language: lang }),
+  });
+}
+
+// ── SSE ────────────────────────────────────────────────────────────────────
+const SILENT_TRANSCRIPTS = new Set(['[manual]', '[undo]', '[reset]']);
+
+function connectSSE() {
+  const connEl = document.getElementById('conn-status');
+  const es     = new EventSource('/stream');
+
+  es.onopen = () => {
+    connEl.className   = 'connected';
+    connEl.textContent = '⬤ connected';
+  };
+
+  es.onmessage = evt => {
+    let data;
+    try { data = JSON.parse(evt.data); } catch { return; }
+    if (data.heartbeat) return;
+
+    if (data.state) {
+      currentState = data.state;
+      updateBeads(currentState);
+      updateDecadeIndicators(currentState);
+      document.getElementById('status-text').textContent = statusText(currentState);
+    }
+
+    if (data.transcript !== undefined) {
+      const txt = document.getElementById('transcript-text');
+      if (SILENT_TRANSCRIPTS.has(data.transcript) || data.transcript === '') {
+        txt.textContent = '';
+      } else {
+        txt.textContent = data.transcript;
+      }
+    }
+  };
+
+  es.onerror = () => {
+    connEl.className   = 'disconnected';
+    connEl.textContent = '⬤ reconnecting…';
+    es.close();
+    setTimeout(connectSSE, 3000);
+  };
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+async function init() {
+  renderBeads();
+
+  try {
+    const res  = await fetch('/language');
+    const data = await res.json();
+    currentLanguage = data.language || 'en';
+  } catch { /* keep default */ }
+
+  document.getElementById('btn-en').classList.toggle('active', currentLanguage === 'en');
+  document.getElementById('btn-da').classList.toggle('active', currentLanguage === 'da');
+  document.documentElement.lang = currentLanguage;
+  applyTranslations();
+
+  connectSSE();
+}
+
+init();
+</script>
+</body>
+</html>

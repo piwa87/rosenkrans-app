@@ -14,5 +14,11 @@ flask>=3.0.0
 #   pip install pyaudio
 sounddevice>=0.4.6
 
+# ── Optional: better voice activity detection ─────────────────────────────────
+# Install for more accurate speech/silence classification (especially in noisy
+# environments).  The app falls back to energy-based VAD if not installed.
+#   pip install webrtcvad-wheels   (pre-built wheels for all platforms)
+# webrtcvad-wheels
+
 # ── Development / testing ─────────────────────────────────────────────────────
 pytest>=7.4.0

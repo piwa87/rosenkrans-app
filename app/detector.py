@@ -118,8 +118,10 @@ PRAYER_ANCHORS: Dict[str, Dict[PrayerType, list[str]]] = {
     for language, prayer_anchors in _RAW_PRAYER_ANCHORS.items()
 }
 
-# Default minimum anchor matches needed for a positive detection
-DETECTION_THRESHOLD = 1
+# Default minimum anchor matches needed for a positive detection.
+# Raised to 2 to reduce false positives — with VAD-based complete utterances,
+# genuine prayers will comfortably match multiple anchors.
+DETECTION_THRESHOLD = 2
 
 # Default cooldown (seconds) before the same prayer can be detected again.
 # Set to ~15 s so a single prayer prayed over several audio chunks counts once.
