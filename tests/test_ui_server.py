@@ -5,8 +5,12 @@ from rosary_state import DecadeState, PrayerType, RosaryStateMachine
 from ui.server import create_app
 
 
-def _client():
-    return create_app(RosaryStateMachine(), LanguageSettings()).test_client()
+from detector import PrayerDetector
+
+
+def _client(with_detector=False):
+    detector = PrayerDetector(threshold=1, cooldown=0.0) if with_detector else None
+    return create_app(RosaryStateMachine(), LanguageSettings(), detector=detector).test_client()
 
 
 # ── Index ─────────────────────────────────────────────────────────────────────
@@ -98,3 +102,47 @@ def test_reset_endpoint_returns_idle():
     assert response.status_code == 200
     assert data["state"] == "IDLE"
     assert data["decade"] == 0
+
+
+# ── Browser transcript (Web STT / mobile) ─────────────────────────────────────
+
+def test_transcript_endpoint_advances_state_on_prayer():
+    with _client(with_detector=True) as client:
+        response = client.post(
+            "/transcript",
+            json={"transcript": "Our Father who art in heaven hallowed be thy name", "language": "en"},
+        )
+    data = response.get_json()
+    assert response.status_code == 200
+    assert data["state"] == "OUR_FATHER"
+    assert data["decade"] == 1
+
+
+def test_transcript_endpoint_no_detection_returns_current_state():
+    with _client(with_detector=True) as client:
+        response = client.post(
+            "/transcript",
+            json={"transcript": "hello how are you", "language": "en"},
+        )
+    data = response.get_json()
+    assert response.status_code == 200
+    assert data["state"] == "IDLE"  # unchanged
+
+
+def test_transcript_endpoint_rejects_empty():
+    with _client(with_detector=True) as client:
+        response = client.post("/transcript", json={"transcript": ""})
+    assert response.status_code == 400
+
+
+def test_transcript_endpoint_without_detector_returns_current_state():
+    # When no detector is configured (detector=None), transcript is accepted
+    # but no prayer detection happens — state is unchanged
+    with _client(with_detector=False) as client:
+        response = client.post(
+            "/transcript",
+            json={"transcript": "Our Father who art in heaven", "language": "en"},
+        )
+    data = response.get_json()
+    assert response.status_code == 200
+    assert data["state"] == "IDLE"  # no detector, no advance

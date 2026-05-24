@@ -8,7 +8,7 @@ import threading
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
-from localization import LanguageSettings, SUPPORTED_LANGUAGES
+from localization import LanguageSettings, SUPPORTED_LANGUAGES, normalize_language
 from rosary_state import RosaryStateMachine
 
 logger = logging.getLogger(__name__)
@@ -43,11 +43,13 @@ def broadcast_event(event: dict) -> None:
 def create_app(
     state_machine: RosaryStateMachine,
     language_settings: LanguageSettings,
+    detector=None,
 ) -> Flask:
     """Create and configure the Flask application."""
     app = Flask(__name__, static_folder=_STATIC_DIR, static_url_path="/static")
     app.state_machine = state_machine          # type: ignore[attr-defined]
     app.language_settings = language_settings  # type: ignore[attr-defined]
+    app.detector = detector                    # type: ignore[attr-defined]
     app.broadcast_event = broadcast_event      # type: ignore[attr-defined]
 
     # ------------------------------------------------------------------
@@ -88,6 +90,39 @@ def create_app(
         app.state_machine.reset()  # type: ignore[attr-defined]
         state = app.state_machine.get_state()  # type: ignore[attr-defined]
         broadcast_event({"state": state.to_dict(), "transcript": "[reset]"})
+        return jsonify(state.to_dict())
+
+    @app.route("/transcript", methods=["POST"])
+    def process_transcript():
+        """
+        Accept a transcript from the browser Web Speech API.
+
+        Used in mobile / web-STT mode where the browser handles mic capture
+        and sends the recognised text here for prayer detection.  The backend
+        runs the same PrayerDetector logic as the Python audio pipeline and
+        broadcasts the result to all SSE clients.
+        """
+        payload = request.get_json(silent=True) or {}
+        transcript = (payload.get("transcript") or "").strip()
+        if not transcript:
+            return jsonify({"error": "empty transcript"}), 400
+
+        lang = normalize_language(
+            payload.get("language") or app.language_settings.get_language()  # type: ignore[attr-defined]
+        )
+
+        det = app.detector  # type: ignore[attr-defined]
+        if det is not None:
+            prayer = det.detect(transcript, language=lang)
+        else:
+            prayer = None
+
+        if prayer is not None:
+            state = app.state_machine.advance(prayer)  # type: ignore[attr-defined]
+        else:
+            state = app.state_machine.get_state()  # type: ignore[attr-defined]
+
+        broadcast_event({"state": state.to_dict(), "transcript": transcript})
         return jsonify(state.to_dict())
 
     # ------------------------------------------------------------------

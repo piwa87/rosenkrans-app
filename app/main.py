@@ -185,6 +185,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Rosary Progress Tracker")
     parser.add_argument("--ui", action="store_true", help="Start the web UI")
     parser.add_argument(
+        "--web-stt",
+        action="store_true",
+        help=(
+            "Disable local audio capture; the browser handles mic and speech recognition "
+            "via the Web Speech API. Requires --ui. "
+            "Useful for mobile use: run the server on a PC/server and open the URL on a phone."
+        ),
+    )
+    parser.add_argument(
         "--model",
         default="small",
         choices=["tiny", "base", "small", "medium", "large", "large-v2", "large-v3"],
@@ -207,7 +216,7 @@ def main() -> None:
     if args.ui:
         from ui.server import create_app, start_ui  # type: ignore[import]
 
-        app = create_app(state_machine, language_settings)
+        app = create_app(state_machine, language_settings, detector=detector)
         on_event = app.broadcast_event  # type: ignore[attr-defined]
 
         ui_thread = threading.Thread(
@@ -215,6 +224,21 @@ def main() -> None:
         )
         ui_thread.start()
         logger.info("Web UI available at http://127.0.0.1:5000")
+
+    if args.web_stt:
+        if not args.ui:
+            logger.error("--web-stt requires --ui")
+            return
+        logger.info(
+            "Web STT mode: Python audio capture disabled. "
+            "Open http://127.0.0.1:5000 on your device and tap the microphone button."
+        )
+        logger.info("Press Ctrl-C to stop.")
+        try:
+            threading.Event().wait()  # sleep until KeyboardInterrupt
+        except KeyboardInterrupt:
+            logger.info("Stopped by user.")
+        return
 
     audio_queue: "queue.Queue[np.ndarray]" = queue.Queue(maxsize=10)
 

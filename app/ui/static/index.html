@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a1a2e">
+  <link rel="manifest" href="/static/manifest.json">
   <title>Rosary Progress Tracker</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -12,11 +17,12 @@
       color: #e0e0e0;
       font-family: Georgia, "Times New Roman", serif;
       min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 20px 16px 32px;
-      gap: 14px;
+      padding: 16px 16px env(safe-area-inset-bottom, 24px);
+      gap: 12px;
     }
 
     /* ── Header ─────────────────────────────────────────────────── */
@@ -31,7 +37,7 @@
     }
 
     #page-title {
-      font-size: 1.35rem;
+      font-size: 1.25rem;
       color: #c8a45a;
       letter-spacing: 0.01em;
     }
@@ -42,18 +48,21 @@
       background: transparent;
       border: 1px solid #444;
       color: #aaa;
-      padding: 4px 14px;
+      padding: 5px 14px;
       border-radius: 4px;
       cursor: pointer;
       font-size: 0.88rem;
       font-family: inherit;
       transition: border-color 0.15s, color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      min-height: 36px;
     }
     .lang-btn.active  { border-color: #c8a45a; color: #c8a45a; }
     .lang-btn:hover:not(.active) { border-color: #777; color: #ccc; }
 
     /* ── SVG ────────────────────────────────────────────────────── */
-    #rosary-container { width: 100%; max-width: 560px; }
+    #rosary-container { width: 100%; max-width: 480px; }
     #rosary-svg       { width: 100%; height: auto; display: block; }
 
     /* ── Legend ─────────────────────────────────────────────────── */
@@ -61,8 +70,8 @@
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: 10px 18px;
-      font-size: 0.82rem;
+      gap: 8px 16px;
+      font-size: 0.8rem;
       color: #999;
     }
     .legend-item { display: flex; align-items: center; gap: 5px; }
@@ -75,40 +84,42 @@
       background: #16213e;
       border: 1px solid #2a3a5e;
       border-radius: 10px;
-      padding: 16px 20px;
+      padding: 14px 18px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
 
     #status-text {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       text-align: center;
       min-height: 1.5em;
       color: #ddd;
     }
 
-    /* ── Transcript ─────────────────────────────────────────────── */
-    #transcript-row {
+    /* ── Transcript rows ────────────────────────────────────────── */
+    .transcript-row {
       display: flex;
-      align-items: center;
+      align-items: baseline;
       gap: 6px;
       min-height: 1.3em;
+      overflow: hidden;
     }
-    #transcript-label {
-      font-size: 0.78rem;
+    .transcript-label {
+      font-size: 0.75rem;
       color: #555;
       white-space: nowrap;
       flex-shrink: 0;
     }
-    #transcript-text {
+    .transcript-val {
       font-size: 0.82rem;
-      color: #7a8fa8;
       font-style: italic;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    #transcript-text   { color: #7a8fa8; }
+    #interim-text      { color: #4a6070; }
 
     /* ── Decade dots ────────────────────────────────────────────── */
     .decade-row {
@@ -127,6 +138,57 @@
     .decade-dot.current  { background: #8b5e10; border-color: #c8a45a; }
     .decade-dot.complete { background: #555;    border-color: #444; }
 
+    /* ── Microphone button ──────────────────────────────────────── */
+    .mic-section {
+      width: 100%;
+      max-width: 580px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #mic-toggle {
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      border: 3px solid #2e6b2e;
+      background: #1a3a1a;
+      color: #90ee90;
+      font-size: 2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
+    }
+    #mic-toggle.listening {
+      border-color: #b03030;
+      background: #3a1010;
+      color: #ff8080;
+      animation: mic-pulse 1.8s ease-in-out infinite;
+    }
+    #mic-toggle.unsupported {
+      border-color: #444;
+      background: #222;
+      color: #555;
+      cursor: not-allowed;
+    }
+    @keyframes mic-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(176, 48, 48, 0.5); }
+      50%       { box-shadow: 0 0 0 14px rgba(176, 48, 48, 0); }
+    }
+
+    #mic-label {
+      font-size: 0.78rem;
+      color: #666;
+      text-align: center;
+    }
+    #mic-label.listening { color: #c06060; }
+
     /* ── Controls ───────────────────────────────────────────────── */
     .controls {
       display: flex;
@@ -140,12 +202,15 @@
       color: #d0d8e8;
       border: 1px solid #1e4d8c;
       border-radius: 6px;
-      padding: 8px 20px;
-      font-size: 0.95rem;
+      padding: 10px 18px;
+      font-size: 0.92rem;
       font-family: inherit;
       cursor: pointer;
       transition: background 0.15s;
-      min-width: 100px;
+      min-width: 90px;
+      min-height: 44px;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
     .ctrl-btn:hover  { background: #184880; }
     .ctrl-btn:active { background: #2060a0; }
@@ -157,14 +222,33 @@
     /* ── Connection indicator ───────────────────────────────────── */
     #conn-status {
       position: fixed;
-      bottom: 8px;
+      bottom: max(8px, env(safe-area-inset-bottom));
       right: 12px;
-      font-size: 0.72rem;
-      color: #444;
+      font-size: 0.7rem;
+      color: #333;
       transition: color 0.3s;
+      pointer-events: none;
     }
-    #conn-status.connected    { color: #2e8b57; }
-    #conn-status.disconnected { color: #a03030; }
+    #conn-status.connected    { color: #2e7a4a; }
+    #conn-status.disconnected { color: #8a3030; }
+
+    /* ── Mobile responsive ──────────────────────────────────────── */
+    @media (max-width: 420px) {
+      body         { padding: 10px 10px env(safe-area-inset-bottom, 20px); gap: 8px; }
+      #page-title  { font-size: 1.05rem; }
+      .panel       { padding: 10px 12px; gap: 8px; }
+      #status-text { font-size: 0.95rem; }
+      .ctrl-btn    { padding: 10px 12px; font-size: 0.87rem; min-width: 76px; }
+      #mic-toggle  { width: 68px; height: 68px; font-size: 1.8rem; }
+      #legend      { font-size: 0.74rem; gap: 6px 12px; }
+    }
+
+    /* Landscape on phone: shrink SVG so controls are visible without scrolling */
+    @media (max-height: 500px) and (orientation: landscape) {
+      #rosary-container { max-width: 260px; }
+      body { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+      header { order: -1; width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -177,7 +261,7 @@
   </div>
 </header>
 
-<!-- SVG rosary -->
+<!-- Rosary SVG -->
 <div id="rosary-container">
   <svg id="rosary-svg" viewBox="0 0 560 560" role="img" aria-label="Rosary bead tracker">
     <title>Rosary bead progress</title>
@@ -189,30 +273,41 @@
 <!-- Legend -->
 <div id="legend">
   <div class="legend-item">
-    <span class="legend-dot" style="width:18px;height:18px;background:#ffd700;"></span>
+    <span class="legend-dot" style="width:16px;height:16px;background:#ffd700;"></span>
     <span id="legend-current">Current bead</span>
   </div>
   <div class="legend-item">
-    <span class="legend-dot" style="width:18px;height:18px;background:#5c2d1e;border:2px solid #a0522d;"></span>
+    <span class="legend-dot" style="width:16px;height:16px;background:#5c2d1e;border:2px solid #a0522d;"></span>
     <span id="legend-our-father">Our Father</span>
   </div>
   <div class="legend-item">
-    <span class="legend-dot" style="width:12px;height:12px;background:#8b6914;"></span>
+    <span class="legend-dot" style="width:11px;height:11px;background:#8b6914;"></span>
     <span id="legend-hail-mary">Hail Mary</span>
   </div>
   <div class="legend-item">
-    <span class="legend-dot" style="width:12px;height:12px;background:#555;"></span>
+    <span class="legend-dot" style="width:11px;height:11px;background:#555;"></span>
     <span id="legend-completed">Completed</span>
   </div>
+</div>
+
+<!-- Microphone toggle -->
+<div class="mic-section">
+  <button id="mic-toggle" onclick="toggleMic()" aria-label="Start listening">🎤</button>
+  <span id="mic-label" id="mic-label">Tap to listen</span>
 </div>
 
 <!-- Status panel -->
 <div class="panel">
   <div id="status-text">🙏 Waiting for prayer…</div>
 
-  <div id="transcript-row">
-    <span id="transcript-label">Heard:</span>
-    <span id="transcript-text"></span>
+  <div class="transcript-row">
+    <span class="transcript-label" id="interim-label"></span>
+    <span class="transcript-val"   id="interim-text"></span>
+  </div>
+
+  <div class="transcript-row">
+    <span class="transcript-label" id="heard-label">Heard:</span>
+    <span class="transcript-val"   id="transcript-text"></span>
   </div>
 
   <div class="decade-row">
@@ -236,15 +331,14 @@
 // ── Constants ──────────────────────────────────────────────────────────────
 const CX = 280, CY = 270, RX = 218, RY = 208;
 const TOTAL = 55, DEC_SIZE = 11;
-
 const NS = 'http://www.w3.org/2000/svg';
 
-// ── State ──────────────────────────────────────────────────────────────────
+// ── App state ──────────────────────────────────────────────────────────────
 let currentLanguage = 'en';
 let currentState    = null;
 
 // ── Translations ───────────────────────────────────────────────────────────
-const TRANSLATIONS = {
+const T = {
   en: {
     page_title:       'Rosary Progress Tracker',
     status_idle:      '🙏 Waiting for prayer…',
@@ -261,6 +355,10 @@ const TRANSLATIONS = {
     btn_undo:         '↩ Undo',
     btn_reset:        'Reset',
     heard_label:      'Heard:',
+    interim_label:    'Listening:',
+    mic_tap:          'Tap to listen',
+    mic_listening:    'Listening — tap to stop',
+    mic_unsupported:  'Speech not supported',
     confirm_reset:    'Reset the entire Rosary? This cannot be undone.',
   },
   da: {
@@ -279,35 +377,36 @@ const TRANSLATIONS = {
     btn_undo:         '↩ Fortryd',
     btn_reset:        'Nulstil',
     heard_label:      'Hørt:',
+    interim_label:    'Lytter:',
+    mic_tap:          'Tryk for at lytte',
+    mic_listening:    'Lytter — tryk for at stoppe',
+    mic_unsupported:  'Tale ikke understøttet',
     confirm_reset:    'Nulstil hele rosenkransen? Dette kan ikke fortrydes.',
   },
 };
 
 function t(key, vars = {}) {
-  const dict = TRANSLATIONS[currentLanguage] || TRANSLATIONS.en;
-  let s = dict[key] || TRANSLATIONS.en[key] || key;
-  for (const [k, v] of Object.entries(vars)) {
-    s = s.replace(`{${k}}`, v);
-  }
+  const d = T[currentLanguage] || T.en;
+  let s   = d[key] ?? T.en[key] ?? key;
+  for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, v);
   return s;
 }
 
-// ── SVG bead data ──────────────────────────────────────────────────────────
+// ── SVG beads ──────────────────────────────────────────────────────────────
 function beadPos(i) {
-  const angle = (i / TOTAL) * 2 * Math.PI - Math.PI / 2;
-  return { x: CX + RX * Math.cos(angle), y: CY + RY * Math.sin(angle) };
+  const a = (i / TOTAL) * 2 * Math.PI - Math.PI / 2;
+  return { x: CX + RX * Math.cos(a), y: CY + RY * Math.sin(a) };
 }
 
 const BEADS = Array.from({ length: TOTAL }, (_, i) => {
   const { x, y } = beadPos(i);
-  const isOF     = i % DEC_SIZE === 0;
+  const isOF = i % DEC_SIZE === 0;
   return { index: i, cx: x, cy: y, r: isOF ? 13 : 7, isOurFather: isOF, decade: Math.floor(i / DEC_SIZE) + 1 };
 });
 
 function renderBeads() {
   const g = document.getElementById('beads-group');
   g.innerHTML = '';
-
   BEADS.forEach(b => {
     const grp    = document.createElementNS(NS, 'g');
     grp.setAttribute('data-bead', b.index);
@@ -323,52 +422,37 @@ function renderBeads() {
 
     if (b.isOurFather) {
       const txt = document.createElementNS(NS, 'text');
-      txt.setAttribute('x',                  b.cx);
-      txt.setAttribute('y',                  b.cy + 0.5);
-      txt.setAttribute('text-anchor',        'middle');
-      txt.setAttribute('dominant-baseline',  'middle');
-      txt.setAttribute('fill',               '#ddd');
-      txt.setAttribute('font-size',          '8');
-      txt.setAttribute('font-family',        'Arial, sans-serif');
-      txt.setAttribute('pointer-events',     'none');
+      txt.setAttribute('x', b.cx); txt.setAttribute('y', b.cy + 0.5);
+      txt.setAttribute('text-anchor', 'middle');
+      txt.setAttribute('dominant-baseline', 'middle');
+      txt.setAttribute('fill', '#ddd'); txt.setAttribute('font-size', '8');
+      txt.setAttribute('font-family', 'Arial, sans-serif');
+      txt.setAttribute('pointer-events', 'none');
       txt.textContent = b.decade;
       grp.appendChild(txt);
     }
-
     g.appendChild(grp);
   });
 }
 
-function activeBeadIndex(state) {
-  if (!state || state.decade === 0) return -1;
-  return (state.decade - 1) * DEC_SIZE + state.bead;
-}
-
 function updateBeads(state) {
-  const ai = activeBeadIndex(state);
-
+  const ai = (state && state.decade > 0) ? (state.decade - 1) * DEC_SIZE + state.bead : -1;
   BEADS.forEach(b => {
     const grp    = document.querySelector(`[data-bead="${b.index}"]`);
     if (!grp) return;
     const circle = grp.querySelector('circle');
     const isActive    = b.index === ai;
     const isCompleted = state && state.completed_decades.includes(b.decade);
-
     if (isActive) {
-      circle.setAttribute('fill',         '#ffd700');
-      circle.setAttribute('stroke',       '#c8960c');
-      circle.setAttribute('stroke-width', '3');
-      circle.setAttribute('r',            b.isOurFather ? 17 : 11);
+      circle.setAttribute('fill', '#ffd700'); circle.setAttribute('stroke', '#c8960c');
+      circle.setAttribute('stroke-width', '3'); circle.setAttribute('r', b.isOurFather ? 17 : 11);
     } else if (isCompleted) {
-      circle.setAttribute('fill',         '#555');
-      circle.setAttribute('stroke',       '#444');
-      circle.setAttribute('stroke-width', '1.5');
-      circle.setAttribute('r',            b.r);
+      circle.setAttribute('fill', '#555'); circle.setAttribute('stroke', '#444');
+      circle.setAttribute('stroke-width', '1.5'); circle.setAttribute('r', b.r);
     } else {
-      circle.setAttribute('fill',         b.isOurFather ? '#5c2d1e' : '#8b6914');
-      circle.setAttribute('stroke',       '#3a2a0a');
-      circle.setAttribute('stroke-width', '1.5');
-      circle.setAttribute('r',            b.r);
+      circle.setAttribute('fill', b.isOurFather ? '#5c2d1e' : '#8b6914');
+      circle.setAttribute('stroke', '#3a2a0a'); circle.setAttribute('stroke-width', '1.5');
+      circle.setAttribute('r', b.r);
     }
   });
 }
@@ -376,15 +460,10 @@ function updateBeads(state) {
 // ── Status text ────────────────────────────────────────────────────────────
 function statusText(state) {
   if (!state) return t('status_idle');
-  switch (state.state) {
-    case 'IDLE':       return t('status_idle');
-    case 'OUR_FATHER': return t('status_our_father', { decade: state.decade });
-    case 'HAIL_MARY':  return t('status_hail_mary',  { decade: state.decade, bead: state.bead });
-    case 'GLORY_BE':   return t('status_glory_be',   { decade: state.decade });
-    case 'FATIMA':     return t('status_fatima',     { decade: state.decade });
-    case 'COMPLETE':   return t('status_complete');
-    default:           return t('status_idle');
-  }
+  const m = { OUR_FATHER: 'status_our_father', HAIL_MARY: 'status_hail_mary',
+              GLORY_BE: 'status_glory_be', FATIMA: 'status_fatima',
+              COMPLETE: 'status_complete', IDLE: 'status_idle' };
+  return t(m[state.state] || 'status_idle', { decade: state.decade, bead: state.bead });
 }
 
 function updateDecadeIndicators(state) {
@@ -392,15 +471,12 @@ function updateDecadeIndicators(state) {
     const dot = document.getElementById(`dec-${i}`);
     if (!dot) continue;
     dot.className = 'decade-dot';
-    if (state && state.completed_decades.includes(i)) {
-      dot.classList.add('complete');
-    } else if (state && state.decade === i) {
-      dot.classList.add('current');
-    }
+    if (state && state.completed_decades.includes(i)) dot.classList.add('complete');
+    else if (state && state.decade === i)              dot.classList.add('current');
   }
 }
 
-// ── Translations applied to DOM ────────────────────────────────────────────
+// ── i18n DOM update ────────────────────────────────────────────────────────
 function applyTranslations() {
   document.title                                             = t('page_title');
   document.getElementById('page-title').textContent         = t('page_title');
@@ -411,24 +487,18 @@ function applyTranslations() {
   document.getElementById('btn-advance').textContent        = t('btn_advance');
   document.getElementById('btn-undo').textContent           = t('btn_undo');
   document.getElementById('btn-reset').textContent          = t('btn_reset');
-  document.getElementById('transcript-label').textContent   = t('heard_label');
-
-  if (currentState) {
-    document.getElementById('status-text').textContent = statusText(currentState);
-  }
+  document.getElementById('heard-label').textContent        = t('heard_label');
+  document.getElementById('interim-label').textContent      = t('interim_label');
+  if (currentState) document.getElementById('status-text').textContent = statusText(currentState);
+  updateMicLabel();
 }
 
 // ── API calls ──────────────────────────────────────────────────────────────
-async function advanceManual() {
-  await fetch('/advance', { method: 'POST' });
-}
+async function advanceManual() { await fetch('/advance', { method: 'POST' }); }
 
 async function undo() {
-  const res = await fetch('/undo', { method: 'POST' });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    if (data.error) console.info('Undo:', data.error);
-  }
+  const r = await fetch('/undo', { method: 'POST' });
+  if (!r.ok) console.info('Undo:', (await r.json().catch(() => ({}))).error);
 }
 
 async function confirmReset() {
@@ -442,15 +512,137 @@ async function setLanguage(lang) {
   document.getElementById('btn-da').classList.toggle('active', lang === 'da');
   document.documentElement.lang = lang;
   applyTranslations();
+  if (micEnabled && activeRecognition) {
+    activeRecognition.abort();  // will restart with new lang via onend handler
+  }
   await fetch('/language', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ language: lang }),
   });
 }
 
+// ── Web Speech API ─────────────────────────────────────────────────────────
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let micEnabled          = false;
+let activeRecognition   = null;
+let micRestartTimer     = null;
+
+function isSpeechSupported() { return !!SpeechRecognition; }
+
+function toggleMic() {
+  if (!isSpeechSupported()) {
+    alert('Speech recognition is not supported in this browser.\n\nUse Chrome on Android or Safari on iOS 14.5+.');
+    return;
+  }
+  micEnabled ? stopMic() : startMic();
+}
+
+function startMic() {
+  micEnabled = true;
+  updateMicLabel();
+  beginRecognitionSession();
+}
+
+function stopMic() {
+  micEnabled = false;
+  clearTimeout(micRestartTimer);
+  if (activeRecognition) { activeRecognition.abort(); activeRecognition = null; }
+  document.getElementById('interim-text').textContent = '';
+  updateMicLabel();
+}
+
+function beginRecognitionSession() {
+  if (!micEnabled || !isSpeechSupported()) return;
+
+  const r     = new SpeechRecognition();
+  r.lang      = currentLanguage === 'da' ? 'da-DK' : 'en-US';
+  r.continuous      = false;  // false works better on iOS
+  r.interimResults  = true;
+  r.maxAlternatives = 1;
+
+  r.onstart = () => {
+    document.getElementById('mic-toggle').className = 'listening';
+    document.getElementById('mic-label').className  = 'listening';
+    document.getElementById('mic-label').textContent = t('mic_listening');
+  };
+
+  r.onresult = e => {
+    const last   = e.results[e.results.length - 1];
+    const text   = last[0].transcript.trim();
+    const isFinal = last.isFinal;
+
+    // Show interim (live) transcript while speaking
+    document.getElementById('interim-text').textContent = isFinal ? '' : text;
+
+    if (isFinal && text) {
+      sendBrowserTranscript(text);
+    }
+  };
+
+  r.onspeechend = () => { r.stop(); };
+
+  r.onerror = e => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      micEnabled = false;
+      updateMicLabel();
+      alert('Microphone access denied.\nPlease allow microphone access in your browser settings and reload the page.');
+    }
+    // 'no-speech', 'aborted', 'network' etc. → let onend restart
+  };
+
+  r.onend = () => {
+    document.getElementById('interim-text').textContent = '';
+    document.getElementById('mic-toggle').className = micEnabled ? '' : '';
+    updateMicLabel();
+    if (micEnabled) {
+      // Brief pause before restarting prevents tight loops on error
+      micRestartTimer = setTimeout(beginRecognitionSession, 300);
+    }
+  };
+
+  try {
+    r.start();
+    activeRecognition = r;
+  } catch (e) {
+    console.warn('Could not start recognition:', e);
+    micRestartTimer = setTimeout(beginRecognitionSession, 600);
+  }
+}
+
+async function sendBrowserTranscript(transcript) {
+  try {
+    await fetch('/transcript', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript, language: currentLanguage }),
+    });
+  } catch (e) {
+    console.warn('Failed to send transcript:', e);
+  }
+}
+
+function updateMicLabel() {
+  const btn = document.getElementById('mic-toggle');
+  const lbl = document.getElementById('mic-label');
+  if (!isSpeechSupported()) {
+    btn.className  = 'unsupported';
+    lbl.textContent = t('mic_unsupported');
+    lbl.className  = '';
+    return;
+  }
+  if (micEnabled) {
+    btn.className  = 'listening';
+    lbl.textContent = t('mic_listening');
+    lbl.className  = 'listening';
+  } else {
+    btn.className  = '';
+    lbl.textContent = t('mic_tap');
+    lbl.className  = '';
+  }
+}
+
 // ── SSE ────────────────────────────────────────────────────────────────────
-const SILENT_TRANSCRIPTS = new Set(['[manual]', '[undo]', '[reset]']);
+const SILENT = new Set(['[manual]', '[undo]', '[reset]']);
 
 function connectSSE() {
   const connEl = document.getElementById('conn-status');
@@ -475,11 +667,7 @@ function connectSSE() {
 
     if (data.transcript !== undefined) {
       const txt = document.getElementById('transcript-text');
-      if (SILENT_TRANSCRIPTS.has(data.transcript) || data.transcript === '') {
-        txt.textContent = '';
-      } else {
-        txt.textContent = data.transcript;
-      }
+      txt.textContent = SILENT.has(data.transcript) || data.transcript === '' ? '' : data.transcript;
     }
   };
 
@@ -491,21 +679,27 @@ function connectSSE() {
   };
 }
 
+// ── Service worker registration ────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+  });
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 async function init() {
   renderBeads();
 
   try {
-    const res  = await fetch('/language');
-    const data = await res.json();
-    currentLanguage = data.language || 'en';
+    const d = await fetch('/language').then(r => r.json());
+    currentLanguage = d.language || 'en';
   } catch { /* keep default */ }
 
   document.getElementById('btn-en').classList.toggle('active', currentLanguage === 'en');
   document.getElementById('btn-da').classList.toggle('active', currentLanguage === 'da');
   document.documentElement.lang = currentLanguage;
   applyTranslations();
-
+  updateMicLabel();
   connectSSE();
 }
 
