@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a1a2e">
+  <link rel="manifest" href="/static/manifest.json">
+  <title>Rosary Progress Tracker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1a1a2e;
+      color: #e0e0e0;
+      font-family: Georgia, "Times New Roman", serif;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 16px env(safe-area-inset-bottom, 24px);
+      gap: 12px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    header {
+      width: 100%;
+      max-width: 580px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    #page-title {
+      font-size: 1.25rem;
+      color: #c8a45a;
+      letter-spacing: 0.01em;
+    }
+
+    .lang-group { display: flex; gap: 6px; }
+
+    .lang-btn {
+      background: transparent;
+      border: 1px solid #444;
+      color: #aaa;
+      padding: 5px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-family: inherit;
+      transition: border-color 0.15s, color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      min-height: 36px;
+    }
+    .lang-btn.active  { border-color: #c8a45a; color: #c8a45a; }
+    .lang-btn:hover:not(.active) { border-color: #777; color: #ccc; }
+
+    /* ── SVG ────────────────────────────────────────────────────── */
+    #rosary-container { width: 100%; max-width: 480px; }
+    #rosary-svg       { width: 100%; height: auto; display: block; }
+
+    /* ── Legend ─────────────────────────────────────────────────── */
+    #legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px 16px;
+      font-size: 0.8rem;
+      color: #999;
+    }
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+    .legend-dot  { display: inline-block; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Status panel ───────────────────────────────────────────── */
+    .panel {
+      width: 100%;
+      max-width: 580px;
+      background: #16213e;
+      border: 1px solid #2a3a5e;
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #status-text {
+      font-size: 1.05rem;
+      text-align: center;
+      min-height: 1.5em;
+      color: #ddd;
+    }
+
+    /* ── Transcript rows ────────────────────────────────────────── */
+    .transcript-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      min-height: 1.3em;
+      overflow: hidden;
+    }
+    .transcript-label {
+      font-size: 0.75rem;
+      color: #555;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .transcript-val {
+      font-size: 0.82rem;
+      font-style: italic;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #transcript-text   { color: #7a8fa8; }
+    #interim-text      { color: #4a6070; }
+
+    /* ── Decade dots ────────────────────────────────────────────── */
+    .decade-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+    .decade-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #252535;
+      border: 2px solid #3a3a55;
+      transition: background 0.3s, border-color 0.3s;
+    }
+    .decade-dot.current  { background: #8b5e10; border-color: #c8a45a; }
+    .decade-dot.complete { background: #555;    border-color: #444; }
+
+    /* ── Microphone button ──────────────────────────────────────── */
+    .mic-section {
+      width: 100%;
+      max-width: 580px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #mic-toggle {
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      border: 3px solid #2e6b2e;
+      background: #1a3a1a;
+      color: #90ee90;
+      font-size: 2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
+    }
+    #mic-toggle.listening {
+      border-color: #b03030;
+      background: #3a1010;
+      color: #ff8080;
+      animation: mic-pulse 1.8s ease-in-out infinite;
+    }
+    #mic-toggle.unsupported {
+      border-color: #444;
+      background: #222;
+      color: #555;
+      cursor: not-allowed;
+    }
+    @keyframes mic-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(176, 48, 48, 0.5); }
+      50%       { box-shadow: 0 0 0 14px rgba(176, 48, 48, 0); }
+    }
+
+    #mic-label {
+      font-size: 0.78rem;
+      color: #666;
+      text-align: center;
+    }
+    #mic-label.listening { color: #c06060; }
+
+    /* ── Controls ───────────────────────────────────────────────── */
+    .controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .ctrl-btn {
+      background: #0f3460;
+      color: #d0d8e8;
+      border: 1px solid #1e4d8c;
+      border-radius: 6px;
+      padding: 10px 18px;
+      font-size: 0.92rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s;
+      min-width: 90px;
+      min-height: 44px;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .ctrl-btn:hover  { background: #184880; }
+    .ctrl-btn:active { background: #2060a0; }
+
+    .ctrl-btn.danger        { background: #3a1010; border-color: #6a2020; }
+    .ctrl-btn.danger:hover  { background: #5a1818; }
+    .ctrl-btn.danger:active { background: #7a2020; }
+
+    /* ── Connection indicator ───────────────────────────────────── */
+    #conn-status {
+      position: fixed;
+      bottom: max(8px, env(safe-area-inset-bottom));
+      right: 12px;
+      font-size: 0.7rem;
+      color: #333;
+      transition: color 0.3s;
+      pointer-events: none;
+    }
+    #conn-status.connected    { color: #2e7a4a; }
+    #conn-status.disconnected { color: #8a3030; }
+
+    /* ── Mobile responsive ──────────────────────────────────────── */
+    @media (max-width: 420px) {
+      body         { padding: 10px 10px env(safe-area-inset-bottom, 20px); gap: 8px; }
+      #page-title  { font-size: 1.05rem; }
+      .panel       { padding: 10px 12px; gap: 8px; }
+      #status-text { font-size: 0.95rem; }
+      .ctrl-btn    { padding: 10px 12px; font-size: 0.87rem; min-width: 76px; }
+      #mic-toggle  { width: 68px; height: 68px; font-size: 1.8rem; }
+      #legend      { font-size: 0.74rem; gap: 6px 12px; }
+    }
+
+    /* Landscape on phone: shrink SVG so controls are visible without scrolling */
+    @media (max-height: 500px) and (orientation: landscape) {
+      #rosary-container { max-width: 260px; }
+      body { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+      header { order: -1; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1 id="page-title">Rosary Progress Tracker</h1>
+  <div class="lang-group">
+    <button class="lang-btn active" id="btn-en" onclick="setLanguage('en')">English</button>
+    <button class="lang-btn"        id="btn-da" onclick="setLanguage('da')">Dansk</button>
+  </div>
+</header>
+
+<!-- Rosary SVG -->
+<div id="rosary-container">
+  <svg id="rosary-svg" viewBox="0 0 560 560" role="img" aria-label="Rosary bead tracker">
+    <title>Rosary bead progress</title>
+    <ellipse cx="280" cy="270" rx="218" ry="208" fill="none" stroke="#5c3d1e" stroke-width="2.5"/>
+    <g id="beads-group"></g>
+  </svg>
+</div>
+
+<!-- Legend -->
+<div id="legend">
+  <div class="legend-item">
+    <span class="legend-dot" style="width:16px;height:16px;background:#ffd700;"></span>
+    <span id="legend-current">Current bead</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-dot" style="width:16px;height:16px;background:#5c2d1e;border:2px solid #a0522d;"></span>
+    <span id="legend-our-father">Our Father</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-dot" style="width:11px;height:11px;background:#8b6914;"></span>
+    <span id="legend-hail-mary">Hail Mary</span>
+  </div>
+  <div class="legend-item">
+    <span class="legend-dot" style="width:11px;height:11px;background:#555;"></span>
+    <span id="legend-completed">Completed</span>
+  </div>
+</div>
+
+<!-- Microphone toggle -->
+<div class="mic-section">
+  <button id="mic-toggle" onclick="toggleMic()" aria-label="Start listening">🎤</button>
+  <span id="mic-label" id="mic-label">Tap to listen</span>
+</div>
+
+<!-- Status panel -->
+<div class="panel">
+  <div id="status-text">🙏 Waiting for prayer…</div>
+
+  <div class="transcript-row">
+    <span class="transcript-label" id="interim-label"></span>
+    <span class="transcript-val"   id="interim-text"></span>
+  </div>
+
+  <div class="transcript-row">
+    <span class="transcript-label" id="heard-label">Heard:</span>
+    <span class="transcript-val"   id="transcript-text"></span>
+  </div>
+
+  <div class="decade-row">
+    <div class="decade-dot" id="dec-1" title="Decade 1"></div>
+    <div class="decade-dot" id="dec-2" title="Decade 2"></div>
+    <div class="decade-dot" id="dec-3" title="Decade 3"></div>
+    <div class="decade-dot" id="dec-4" title="Decade 4"></div>
+    <div class="decade-dot" id="dec-5" title="Decade 5"></div>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl-btn"        id="btn-advance" onclick="advanceManual()">Next Bead</button>
+    <button class="ctrl-btn"        id="btn-undo"    onclick="undo()">↩ Undo</button>
+    <button class="ctrl-btn danger" id="btn-reset"   onclick="confirmReset()">Reset</button>
+  </div>
+</div>
+
+<div id="conn-status">⬤ connecting…</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const CX = 280, CY = 270, RX = 218, RY = 208;
+const TOTAL = 55, DEC_SIZE = 11;
+const NS = 'http://www.w3.org/2000/svg';
+
+// ── App state ──────────────────────────────────────────────────────────────
+let currentLanguage = 'en';
+let currentState    = null;
+
+// ── Translations ───────────────────────────────────────────────────────────
+const T = {
+  en: {
+    page_title:       'Rosary Progress Tracker',
+    status_idle:      '🙏 Waiting for prayer…',
+    status_our_father:'✝️  Decade {decade} — Our Father',
+    status_hail_mary: '📿 Decade {decade} — Hail Mary {bead} / 10',
+    status_glory_be:  '✨ Decade {decade} — Glory Be ✓',
+    status_fatima:    '🙏 Decade {decade} — O My Jesus…',
+    status_complete:  '🎉 Rosary Complete! God bless you.',
+    legend_current:   'Current bead',
+    legend_our_father:'Our Father',
+    legend_hail_mary: 'Hail Mary',
+    legend_completed: 'Completed',
+    btn_advance:      'Next Bead',
+    btn_undo:         '↩ Undo',
+    btn_reset:        'Reset',
+    heard_label:      'Heard:',
+    interim_label:    'Listening:',
+    mic_tap:          'Tap to listen',
+    mic_listening:    'Listening — tap to stop',
+    mic_unsupported:  'Speech not supported',
+    confirm_reset:    'Reset the entire Rosary? This cannot be undone.',
+  },
+  da: {
+    page_title:       'Rosenkrans-fremskridt',
+    status_idle:      '🙏 Venter på bøn…',
+    status_our_father:'✝️  Dekade {decade} — Fadervor',
+    status_hail_mary: '📿 Dekade {decade} — Hil dig, Maria {bead} / 10',
+    status_glory_be:  '✨ Dekade {decade} — Ære være Faderen ✓',
+    status_fatima:    '🙏 Dekade {decade} — O min Jesus…',
+    status_complete:  '🎉 Rosenkransen er fuldført! Gud velsigne dig.',
+    legend_current:   'Nuværende perle',
+    legend_our_father:'Fadervor',
+    legend_hail_mary: 'Hil dig, Maria',
+    legend_completed: 'Fuldført',
+    btn_advance:      'Næste perle',
+    btn_undo:         '↩ Fortryd',
+    btn_reset:        'Nulstil',
+    heard_label:      'Hørt:',
+    interim_label:    'Lytter:',
+    mic_tap:          'Tryk for at lytte',
+    mic_listening:    'Lytter — tryk for at stoppe',
+    mic_unsupported:  'Tale ikke understøttet',
+    confirm_reset:    'Nulstil hele rosenkransen? Dette kan ikke fortrydes.',
+  },
+};
+
+function t(key, vars = {}) {
+  const d = T[currentLanguage] || T.en;
+  let s   = d[key] ?? T.en[key] ?? key;
+  for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, v);
+  return s;
+}
+
+// ── SVG beads ──────────────────────────────────────────────────────────────
+function beadPos(i) {
+  const a = (i / TOTAL) * 2 * Math.PI - Math.PI / 2;
+  return { x: CX + RX * Math.cos(a), y: CY + RY * Math.sin(a) };
+}
+
+const BEADS = Array.from({ length: TOTAL }, (_, i) => {
+  const { x, y } = beadPos(i);
+  const isOF = i % DEC_SIZE === 0;
+  return { index: i, cx: x, cy: y, r: isOF ? 13 : 7, isOurFather: isOF, decade: Math.floor(i / DEC_SIZE) + 1 };
+});
+
+function renderBeads() {
+  const g = document.getElementById('beads-group');
+  g.innerHTML = '';
+  BEADS.forEach(b => {
+    const grp    = document.createElementNS(NS, 'g');
+    grp.setAttribute('data-bead', b.index);
+
+    const circle = document.createElementNS(NS, 'circle');
+    circle.setAttribute('cx', b.cx);
+    circle.setAttribute('cy', b.cy);
+    circle.setAttribute('r',  b.r);
+    circle.setAttribute('fill',         b.isOurFather ? '#5c2d1e' : '#8b6914');
+    circle.setAttribute('stroke',       '#3a2a0a');
+    circle.setAttribute('stroke-width', '1.5');
+    grp.appendChild(circle);
+
+    if (b.isOurFather) {
+      const txt = document.createElementNS(NS, 'text');
+      txt.setAttribute('x', b.cx); txt.setAttribute('y', b.cy + 0.5);
+      txt.setAttribute('text-anchor', 'middle');
+      txt.setAttribute('dominant-baseline', 'middle');
+      txt.setAttribute('fill', '#ddd'); txt.setAttribute('font-size', '8');
+      txt.setAttribute('font-family', 'Arial, sans-serif');
+      txt.setAttribute('pointer-events', 'none');
+      txt.textContent = b.decade;
+      grp.appendChild(txt);
+    }
+    g.appendChild(grp);
+  });
+}
+
+function updateBeads(state) {
+  const ai = (state && state.decade > 0) ? (state.decade - 1) * DEC_SIZE + state.bead : -1;
+  BEADS.forEach(b => {
+    const grp    = document.querySelector(`[data-bead="${b.index}"]`);
+    if (!grp) return;
+    const circle = grp.querySelector('circle');
+    const isActive    = b.index === ai;
+    const isCompleted = state && state.completed_decades.includes(b.decade);
+    if (isActive) {
+      circle.setAttribute('fill', '#ffd700'); circle.setAttribute('stroke', '#c8960c');
+      circle.setAttribute('stroke-width', '3'); circle.setAttribute('r', b.isOurFather ? 17 : 11);
+    } else if (isCompleted) {
+      circle.setAttribute('fill', '#555'); circle.setAttribute('stroke', '#444');
+      circle.setAttribute('stroke-width', '1.5'); circle.setAttribute('r', b.r);
+    } else {
+      circle.setAttribute('fill', b.isOurFather ? '#5c2d1e' : '#8b6914');
+      circle.setAttribute('stroke', '#3a2a0a'); circle.setAttribute('stroke-width', '1.5');
+      circle.setAttribute('r', b.r);
+    }
+  });
+}
+
+// ── Status text ────────────────────────────────────────────────────────────
+function statusText(state) {
+  if (!state) return t('status_idle');
+  const m = { OUR_FATHER: 'status_our_father', HAIL_MARY: 'status_hail_mary',
+              GLORY_BE: 'status_glory_be', FATIMA: 'status_fatima',
+              COMPLETE: 'status_complete', IDLE: 'status_idle' };
+  return t(m[state.state] || 'status_idle', { decade: state.decade, bead: state.bead });
+}
+
+function updateDecadeIndicators(state) {
+  for (let i = 1; i <= 5; i++) {
+    const dot = document.getElementById(`dec-${i}`);
+    if (!dot) continue;
+    dot.className = 'decade-dot';
+    if (state && state.completed_decades.includes(i)) dot.classList.add('complete');
+    else if (state && state.decade === i)              dot.classList.add('current');
+  }
+}
+
+// ── i18n DOM update ────────────────────────────────────────────────────────
+function applyTranslations() {
+  document.title                                             = t('page_title');
+  document.getElementById('page-title').textContent         = t('page_title');
+  document.getElementById('legend-current').textContent     = t('legend_current');
+  document.getElementById('legend-our-father').textContent  = t('legend_our_father');
+  document.getElementById('legend-hail-mary').textContent   = t('legend_hail_mary');
+  document.getElementById('legend-completed').textContent   = t('legend_completed');
+  document.getElementById('btn-advance').textContent        = t('btn_advance');
+  document.getElementById('btn-undo').textContent           = t('btn_undo');
+  document.getElementById('btn-reset').textContent          = t('btn_reset');
+  document.getElementById('heard-label').textContent        = t('heard_label');
+  document.getElementById('interim-label').textContent      = t('interim_label');
+  if (currentState) document.getElementById('status-text').textContent = statusText(currentState);
+  updateMicLabel();
+}
+
+// ── API calls ──────────────────────────────────────────────────────────────
+async function advanceManual() { await fetch('/advance', { method: 'POST' }); }
+
+async function undo() {
+  const r = await fetch('/undo', { method: 'POST' });
+  if (!r.ok) console.info('Undo:', (await r.json().catch(() => ({}))).error);
+}
+
+async function confirmReset() {
+  if (!confirm(t('confirm_reset'))) return;
+  await fetch('/reset', { method: 'POST' });
+}
+
+async function setLanguage(lang) {
+  currentLanguage = lang;
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  document.getElementById('btn-da').classList.toggle('active', lang === 'da');
+  document.documentElement.lang = lang;
+  applyTranslations();
+  if (micEnabled && activeRecognition) {
+    activeRecognition.abort();  // will restart with new lang via onend handler
+  }
+  await fetch('/language', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ language: lang }),
+  });
+}
+
+// ── Web Speech API ─────────────────────────────────────────────────────────
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let micEnabled          = false;
+let activeRecognition   = null;
+let micRestartTimer     = null;
+
+function isSpeechSupported() { return !!SpeechRecognition; }
+
+function toggleMic() {
+  if (!isSpeechSupported()) {
+    alert('Speech recognition is not supported in this browser.\n\nUse Chrome on Android or Safari on iOS 14.5+.');
+    return;
+  }
+  micEnabled ? stopMic() : startMic();
+}
+
+function startMic() {
+  micEnabled = true;
+  updateMicLabel();
+  beginRecognitionSession();
+}
+
+function stopMic() {
+  micEnabled = false;
+  clearTimeout(micRestartTimer);
+  if (activeRecognition) { activeRecognition.abort(); activeRecognition = null; }
+  document.getElementById('interim-text').textContent = '';
+  updateMicLabel();
+}
+
+function beginRecognitionSession() {
+  if (!micEnabled || !isSpeechSupported()) return;
+
+  const r     = new SpeechRecognition();
+  r.lang      = currentLanguage === 'da' ? 'da-DK' : 'en-US';
+  r.continuous      = false;  // false works better on iOS
+  r.interimResults  = true;
+  r.maxAlternatives = 1;
+
+  r.onstart = () => {
+    document.getElementById('mic-toggle').className = 'listening';
+    document.getElementById('mic-label').className  = 'listening';
+    document.getElementById('mic-label').textContent = t('mic_listening');
+  };
+
+  r.onresult = e => {
+    const last   = e.results[e.results.length - 1];
+    const text   = last[0].transcript.trim();
+    const isFinal = last.isFinal;
+
+    // Show interim (live) transcript while speaking
+    document.getElementById('interim-text').textContent = isFinal ? '' : text;
+
+    if (isFinal && text) {
+      sendBrowserTranscript(text);
+    }
+  };
+
+  r.onspeechend = () => { r.stop(); };
+
+  r.onerror = e => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      micEnabled = false;
+      updateMicLabel();
+      alert('Microphone access denied.\nPlease allow microphone access in your browser settings and reload the page.');
+    }
+    // 'no-speech', 'aborted', 'network' etc. → let onend restart
+  };
+
+  r.onend = () => {
+    document.getElementById('interim-text').textContent = '';
+    document.getElementById('mic-toggle').className = micEnabled ? '' : '';
+    updateMicLabel();
+    if (micEnabled) {
+      // Brief pause before restarting prevents tight loops on error
+      micRestartTimer = setTimeout(beginRecognitionSession, 300);
+    }
+  };
+
+  try {
+    r.start();
+    activeRecognition = r;
+  } catch (e) {
+    console.warn('Could not start recognition:', e);
+    micRestartTimer = setTimeout(beginRecognitionSession, 600);
+  }
+}
+
+async function sendBrowserTranscript(transcript) {
+  try {
+    await fetch('/transcript', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript, language: currentLanguage }),
+    });
+  } catch (e) {
+    console.warn('Failed to send transcript:', e);
+  }
+}
+
+function updateMicLabel() {
+  const btn = document.getElementById('mic-toggle');
+  const lbl = document.getElementById('mic-label');
+  if (!isSpeechSupported()) {
+    btn.className  = 'unsupported';
+    lbl.textContent = t('mic_unsupported');
+    lbl.className  = '';
+    return;
+  }
+  if (micEnabled) {
+    btn.className  = 'listening';
+    lbl.textContent = t('mic_listening');
+    lbl.className  = 'listening';
+  } else {
+    btn.className  = '';
+    lbl.textContent = t('mic_tap');
+    lbl.className  = '';
+  }
+}
+
+// ── SSE ────────────────────────────────────────────────────────────────────
+const SILENT = new Set(['[manual]', '[undo]', '[reset]']);
+
+function connectSSE() {
+  const connEl = document.getElementById('conn-status');
+  const es     = new EventSource('/stream');
+
+  es.onopen = () => {
+    connEl.className   = 'connected';
+    connEl.textContent = '⬤ connected';
+  };
+
+  es.onmessage = evt => {
+    let data;
+    try { data = JSON.parse(evt.data); } catch { return; }
+    if (data.heartbeat) return;
+
+    if (data.state) {
+      currentState = data.state;
+      updateBeads(currentState);
+      updateDecadeIndicators(currentState);
+      document.getElementById('status-text').textContent = statusText(currentState);
+    }
+
+    if (data.transcript !== undefined) {
+      const txt = document.getElementById('transcript-text');
+      txt.textContent = SILENT.has(data.transcript) || data.transcript === '' ? '' : data.transcript;
+    }
+  };
+
+  es.onerror = () => {
+    connEl.className   = 'disconnected';
+    connEl.textContent = '⬤ reconnecting…';
+    es.close();
+    setTimeout(connectSSE, 3000);
+  };
+}
+
+// ── Service worker registration ────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+  });
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+async function init() {
+  renderBeads();
+
+  try {
+    const d = await fetch('/language').then(r => r.json());
+    currentLanguage = d.language || 'en';
+  } catch { /* keep default */ }
+
+  document.getElementById('btn-en').classList.toggle('active', currentLanguage === 'en');
+  document.getElementById('btn-da').classList.toggle('active', currentLanguage === 'da');
+  document.documentElement.lang = currentLanguage;
+  applyTranslations();
+  updateMicLabel();
+  connectSSE();
+}
+
+init();
+</script>
+</body>
+</html>

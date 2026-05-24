@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Rosary">
+  <meta name="theme-color" content="#1a1a2e">
+  <link rel="manifest" href="./manifest.json">
+  <title>Rosary Progress Tracker</title>
+  <style>
+    :root {
+      --bg:       #1a1a2e;
+      --panel:    #16213e;
+      --border:   #2a3a5e;
+      --text:     #e0e0e0;
+      --muted:    #888;
+      --gold:     #c8a45a;
+      --gold-hi:  #ffd700;
+      --bead-of:  #5c2d1e;
+      --bead-hm:  #8b6914;
+      --bead-done:#555;
+      --safe-b:   env(safe-area-inset-bottom, 0px);
+      --safe-t:   env(safe-area-inset-top, 0px);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      height: 100%; height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: Georgia, "Times New Roman", serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: calc(var(--safe-t) + 10px) 14px calc(var(--safe-b) + 16px);
+      gap: 8px;
+      /* allow scroll on very small screens */
+      overflow-y: auto;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    header {
+      width: 100%;
+      max-width: 500px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    #page-title { font-size: 1.1rem; color: var(--gold); }
+
+    .lang-group { display: flex; gap: 5px; }
+    .lang-btn {
+      background: transparent;
+      border: 1px solid #444;
+      color: #888;
+      padding: 5px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-family: inherit;
+      min-height: 36px;
+      touch-action: manipulation;
+      transition: border-color .15s, color .15s;
+    }
+    .lang-btn.active { border-color: var(--gold); color: var(--gold); }
+
+    /* ── SVG ─────────────────────────────────────────────────── */
+    #rosary-wrap {
+      /* never bigger than the viewport width, and cap at ~45% of height */
+      width: min(100%, min(90vw, 44vh));
+      flex-shrink: 0;
+    }
+    #rosary-svg { width: 100%; height: auto; display: block; }
+
+    /* ── Decade dots ─────────────────────────────────────────── */
+    .decade-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .ddot {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: #252535;
+      border: 2px solid #3a3a55;
+      transition: background .3s, border-color .3s;
+    }
+    .ddot.current  { background: #8b5e10; border-color: var(--gold); }
+    .ddot.complete { background: var(--bead-done); border-color: #444; }
+
+    /* ── Status ──────────────────────────────────────────────── */
+    #status-text {
+      font-size: 1rem;
+      text-align: center;
+      color: #ddd;
+      min-height: 1.4em;
+      flex-shrink: 0;
+    }
+
+    /* ── Mic section ─────────────────────────────────────────── */
+    .mic-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    #mic-btn {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      border: 3px solid #2e6b2e;
+      background: #162816;
+      color: #6dca6d;
+      font-size: 1.9rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .2s;
+      touch-action: manipulation;
+      user-select: none;
+    }
+    #mic-btn.listening {
+      border-color: #b03030;
+      background: #2a1010;
+      color: #ff8080;
+      animation: mpulse 1.8s ease-in-out infinite;
+    }
+    #mic-btn.off {
+      border-color: #333; background: #1a1a1a; color: #444;
+      cursor: default;
+    }
+    @keyframes mpulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(176,48,48,.5); }
+      50%      { box-shadow: 0 0 0 14px rgba(176,48,48,0); }
+    }
+    #mic-label { font-size: 0.73rem; color: var(--muted); text-align: center; }
+    #mic-label.listening { color: #c06060; }
+
+    /* ── Transcript ──────────────────────────────────────────── */
+    .heard-row {
+      display: flex; gap: 5px; align-items: baseline;
+      min-height: 1.2em; width: 100%; max-width: 500px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .heard-lbl { font-size: 0.72rem; color: #444; white-space: nowrap; flex-shrink: 0; }
+    .heard-val { font-size: 0.8rem; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #interim-val { color: #405060; }
+    #heard-val   { color: #6a8098; }
+
+    /* ── Controls ────────────────────────────────────────────── */
+    .controls {
+      display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .ctrl-btn {
+      background: #0f3460;
+      color: #d0d8e8;
+      border: 1px solid #1e4d8c;
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      min-width: 88px;
+      min-height: 44px;
+      touch-action: manipulation;
+      transition: background .15s;
+    }
+    .ctrl-btn:active { background: #1e5a9a; }
+    .ctrl-btn.danger { background: #3a1010; border-color: #6a2020; }
+    .ctrl-btn.danger:active { background: #6a2020; }
+
+    /* ── Legend (compact) ────────────────────────────────────── */
+    #legend {
+      display: flex; flex-wrap: wrap; justify-content: center;
+      gap: 5px 12px; font-size: 0.72rem; color: #777;
+      flex-shrink: 0;
+    }
+    .li { display: flex; align-items: center; gap: 4px; }
+    .ld { display: inline-block; border-radius: 50%; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span id="page-title">📿 Rosary</span>
+  <div class="lang-group">
+    <button class="lang-btn active" id="btn-en" onclick="setLang('en')">English</button>
+    <button class="lang-btn"        id="btn-da" onclick="setLang('da')">Dansk</button>
+  </div>
+</header>
+
+<div id="rosary-wrap">
+  <svg id="rosary-svg" viewBox="0 0 560 560" role="img" aria-label="Rosary bead tracker">
+    <title>Rosary bead progress</title>
+    <ellipse cx="280" cy="270" rx="218" ry="208" fill="none" stroke="#5c3d1e" stroke-width="2.5"/>
+    <g id="beads"></g>
+  </svg>
+</div>
+
+<div class="decade-row">
+  <div class="ddot" id="d1"></div>
+  <div class="ddot" id="d2"></div>
+  <div class="ddot" id="d3"></div>
+  <div class="ddot" id="d4"></div>
+  <div class="ddot" id="d5"></div>
+</div>
+
+<div id="status-text">🙏 Waiting…</div>
+
+<div class="mic-wrap">
+  <button id="mic-btn" onclick="toggleMic()" aria-label="Start listening">🎤</button>
+  <span id="mic-label">Tap to listen</span>
+</div>
+
+<div class="heard-row">
+  <span class="heard-lbl" id="interim-lbl"></span>
+  <span class="heard-val" id="interim-val"></span>
+</div>
+<div class="heard-row">
+  <span class="heard-lbl" id="heard-lbl">Heard:</span>
+  <span class="heard-val" id="heard-val"></span>
+</div>
+
+<div class="controls">
+  <button class="ctrl-btn"        id="btn-next"  onclick="nextBead()">Next Bead</button>
+  <button class="ctrl-btn"        id="btn-undo"  onclick="doUndo()">↩ Undo</button>
+  <button class="ctrl-btn danger" id="btn-reset" onclick="doReset()">Reset</button>
+</div>
+
+<div id="legend">
+  <div class="li"><span class="ld" style="width:14px;height:14px;background:#ffd700;"></span><span id="lg-cur">Current</span></div>
+  <div class="li"><span class="ld" style="width:14px;height:14px;background:#5c2d1e;border:2px solid #a0522d;"></span><span id="lg-of">Our Father</span></div>
+  <div class="li"><span class="ld" style="width:10px;height:10px;background:#8b6914;"></span><span id="lg-hm">Hail Mary</span></div>
+  <div class="li"><span class="ld" style="width:10px;height:10px;background:#555;"></span><span id="lg-done">Completed</span></div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  TRANSLATIONS
+// ═══════════════════════════════════════════════════════════
+const TR = {
+  en: {
+    title: '📿 Rosary',
+    idle:        '🙏 Waiting for prayer…',
+    our_father:  '✝️  Decade {d} — Our Father',
+    hail_mary:   '📿 Decade {d} — Hail Mary {b} / 10',
+    glory_be:    '✨ Decade {d} — Glory Be ✓',
+    fatima:      '🙏 Decade {d} — O My Jesus…',
+    complete:    '🎉 Rosary Complete! God bless you.',
+    mic_tap:     'Tap to listen',
+    mic_on:      'Listening — tap to stop',
+    mic_none:    'Speech not supported in this browser',
+    interim_lbl: 'Listening:',
+    heard_lbl:   'Heard:',
+    next_bead:   'Next Bead',
+    undo:        '↩ Undo',
+    reset:       'Reset',
+    confirm:     'Reset the entire Rosary?',
+    lg_cur:      'Current',
+    lg_of:       'Our Father',
+    lg_hm:       'Hail Mary',
+    lg_done:     'Completed',
+  },
+  da: {
+    title: '📿 Rosenkrans',
+    idle:        '🙏 Venter på bøn…',
+    our_father:  '✝️  Dekade {d} — Fadervor',
+    hail_mary:   '📿 Dekade {d} — Hil dig, Maria {b} / 10',
+    glory_be:    '✨ Dekade {d} — Ære være Faderen ✓',
+    fatima:      '🙏 Dekade {d} — O min Jesus…',
+    complete:    '🎉 Rosenkransen fuldført! Gud velsigne dig.',
+    mic_tap:     'Tryk for at lytte',
+    mic_on:      'Lytter — tryk for at stoppe',
+    mic_none:    'Tale ikke understøttet i denne browser',
+    interim_lbl: 'Lytter:',
+    heard_lbl:   'Hørt:',
+    next_bead:   'Næste perle',
+    undo:        '↩ Fortryd',
+    reset:       'Nulstil',
+    confirm:     'Nulstil hele rosenkransen?',
+    lg_cur:      'Nuværende',
+    lg_of:       'Fadervor',
+    lg_hm:       'Hil dig, Maria',
+    lg_done:     'Fuldført',
+  },
+};
+
+function t(key, vars = {}) {
+  const d = TR[lang] || TR.en;
+  let s = d[key] ?? TR.en[key] ?? key;
+  for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, v);
+  return s;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PRAYER ANCHORS  (mirrors detector.py — pre-normalised)
+// ═══════════════════════════════════════════════════════════
+const RAW_ANCHORS = {
+  en: {
+    OUR_FATHER: ['our father','who art in heaven','hallowed be thy name',
+      'thy kingdom come','thy will be done','give us this day','daily bread',
+      'forgive us our trespasses','lead us not into temptation',
+      'deliver us from evil','for thine is the kingdom'],
+    HAIL_MARY:  ['hail mary','full of grace','the lord is with thee',
+      'blessed art thou among women','blessed is the fruit','holy mary',
+      'mother of god','pray for us sinners','now and at the hour',
+      'hour of our death'],
+    GLORY_BE:   ['glory be','glory be to the father','and to the son',
+      'and to the holy spirit','as it was in the beginning',
+      'world without end','forever and ever'],
+    FATIMA:     ['o my jesus','forgive us our sins','save us from the fires',
+      'lead all souls to heaven'],
+  },
+  da: {
+    OUR_FATHER: ['fader vor','fadervor','du som er i himlene',
+      'helliget vorde dit navn','komme dit rige','ske din vilje',
+      'giv os i dag vort daglige brod','forlad os vor skyld',
+      'som ogsa vi forlader vore skyldnere','led os ikke i fristelse',
+      'fri os fra det onde','pa jorden'],
+    HAIL_MARY:  ['hil dig maria','fuld af nade','herren er med dig',
+      'velsignet er du blandt kvinder','velsignet er du iblandt kvinder',
+      'velsignet er dit livs frugt','hellige maria','guds moder',
+      'bed for os syndere','nu og i vor dodstime'],
+    GLORY_BE:   ['aere vaere faderen','og sonnen','og helliganden',
+      'som det var i begyndelsen','er nu og altid','og i al evighed'],
+    FATIMA:     ['o min jesus','tilgiv os vore synder',
+      'frels os fra helvedes ild','for alle sjaele til himlen'],
+  },
+};
+
+// Normalise text exactly as detector.py does
+function norm(text) {
+  let s = text.toLowerCase()
+              .normalize('NFD')
+              .replace(/[̀-ͯ]/g, '');  // strip combining chars (handles å→a)
+  return s.replace(/æ/g, 'ae').replace(/ø/g, 'o');
+}
+
+// Build pre-normalised anchor table
+const ANCHORS = {};
+for (const [l, prayers] of Object.entries(RAW_ANCHORS)) {
+  ANCHORS[l] = {};
+  for (const [p, arr] of Object.entries(prayers)) ANCHORS[l][p] = arr.map(norm);
+}
+
+// ── PrayerDetector ─────────────────────────────────────────
+const THRESHOLD = 2;
+const COOLDOWN  = 15; // seconds
+const _lastDetect = {};
+
+function detectPrayer(transcript, language) {
+  const text    = norm(transcript);
+  const anchors = ANCHORS[language] || ANCHORS.en;
+  const scores  = {};
+
+  for (const [prayer, phrases] of Object.entries(anchors)) {
+    const n = phrases.filter(p => text.includes(p)).length;
+    if (n > 0) scores[prayer] = n;
+  }
+
+  if (!Object.keys(scores).length) return null;
+
+  const [best, bestScore] = Object.entries(scores).sort((a,b) => b[1]-a[1])[0];
+  if (bestScore < THRESHOLD) return null;
+
+  const now = Date.now() / 1000;
+  if (now - (_lastDetect[best] || -Infinity) < COOLDOWN) return null;
+
+  _lastDetect[best] = now;
+  console.log(`Detected: ${best} (score=${bestScore})`);
+  return best;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  STATE MACHINE  (mirrors rosary_state.py)
+// ═══════════════════════════════════════════════════════════
+const DS = Object.freeze({
+  IDLE:'IDLE', OUR_FATHER:'OUR_FATHER', HAIL_MARY:'HAIL_MARY',
+  GLORY_BE:'GLORY_BE', FATIMA:'FATIMA', COMPLETE:'COMPLETE',
+});
+const MAX_HM = 10, MAX_DEC = 5, MAX_HIST = 30;
+
+let state   = freshState();
+let history = [];
+
+function freshState() {
+  return { decade:0, bead:0, state:DS.IDLE, completedDecades:[], lastPrayer:null };
+}
+function cloneState(s) {
+  return { ...s, completedDecades: [...s.completedDecades] };
+}
+function pushHistory() {
+  history.push(cloneState(state));
+  if (history.length > MAX_HIST) history.shift();
+}
+
+function applyPrayer(prayer) {
+  const s = state;
+  if (prayer === 'OUR_FATHER') {
+    if ([DS.IDLE, DS.GLORY_BE, DS.FATIMA].includes(s.state)) {
+      s.decade++; s.bead = 0; s.state = DS.OUR_FATHER;
+    }
+  } else if (prayer === 'HAIL_MARY') {
+    if ([DS.OUR_FATHER, DS.HAIL_MARY].includes(s.state) && s.bead < MAX_HM) {
+      s.bead++; s.state = DS.HAIL_MARY;
+    }
+  } else if (prayer === 'GLORY_BE') {
+    if (s.state === DS.HAIL_MARY) {
+      s.state = DS.GLORY_BE;
+      if (!s.completedDecades.includes(s.decade)) s.completedDecades.push(s.decade);
+      if (s.decade >= MAX_DEC) s.state = DS.COMPLETE;
+    }
+  } else if (prayer === 'FATIMA') {
+    if (s.state === DS.GLORY_BE) s.state = DS.FATIMA;
+  }
+  s.lastPrayer = prayer;
+}
+
+function nextExpected() {
+  const s = state;
+  if (s.state === DS.IDLE)       return 'OUR_FATHER';
+  if (s.state === DS.OUR_FATHER) return 'HAIL_MARY';
+  if (s.state === DS.HAIL_MARY)  return s.bead < MAX_HM ? 'HAIL_MARY' : 'GLORY_BE';
+  if (s.state === DS.GLORY_BE)   return 'FATIMA';
+  if (s.state === DS.FATIMA)     return 'OUR_FATHER';
+  return null;
+}
+
+function advance(prayer)     { pushHistory(); applyPrayer(prayer); refresh(); persist(); }
+function advanceManual()     { const p = nextExpected(); if (p) { pushHistory(); applyPrayer(p); refresh(); persist(); } }
+function doUndo()            { if (history.length) { state = history.pop(); refresh(); persist(); } }
+function doReset()           { if (!confirm(t('confirm'))) return; state = freshState(); history = []; refresh(); persist(); }
+
+// ═══════════════════════════════════════════════════════════
+//  PERSISTENCE (localStorage)
+// ═══════════════════════════════════════════════════════════
+const STORE_KEY = 'rosary-state-v1';
+const TTL = 3 * 60 * 60 * 1000; // 3 hours
+
+function persist() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify({ ...state, lang, ts: Date.now() }));
+  } catch {}
+}
+
+function restore() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (Date.now() - (saved.ts || 0) > TTL) return;
+    state = {
+      decade: saved.decade || 0,
+      bead:   saved.bead   || 0,
+      state:  saved.state  || DS.IDLE,
+      completedDecades: saved.completedDecades || [],
+      lastPrayer: saved.lastPrayer || null,
+    };
+    lang = saved.lang || 'en';
+  } catch {}
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SVG BEAD RENDERING
+// ═══════════════════════════════════════════════════════════
+const NS = 'http://www.w3.org/2000/svg';
+const CX = 280, CY = 270, RX = 218, RY = 208;
+const TOTAL = 55, DSIZ = 11;
+
+const BEADS = Array.from({ length: TOTAL }, (_, i) => {
+  const a = (i / TOTAL) * 2 * Math.PI - Math.PI / 2;
+  const isOF = i % DSIZ === 0;
+  return {
+    i, cx: CX + RX * Math.cos(a), cy: CY + RY * Math.sin(a),
+    r: isOF ? 13 : 7, isOF, dec: Math.floor(i / DSIZ) + 1,
+  };
+});
+
+function buildBeads() {
+  const g = document.getElementById('beads');
+  g.innerHTML = '';
+  BEADS.forEach(b => {
+    const grp = document.createElementNS(NS, 'g');
+    grp.setAttribute('data-i', b.i);
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', b.cx); c.setAttribute('cy', b.cy); c.setAttribute('r', b.r);
+    c.setAttribute('fill', b.isOF ? '#5c2d1e' : '#8b6914');
+    c.setAttribute('stroke', '#3a2a0a'); c.setAttribute('stroke-width', '1.5');
+    grp.appendChild(c);
+    if (b.isOF) {
+      const tx = document.createElementNS(NS, 'text');
+      tx.setAttribute('x', b.cx); tx.setAttribute('y', b.cy + 0.5);
+      tx.setAttribute('text-anchor', 'middle'); tx.setAttribute('dominant-baseline', 'middle');
+      tx.setAttribute('fill', '#ddd'); tx.setAttribute('font-size', '8');
+      tx.setAttribute('font-family', 'Arial,sans-serif'); tx.setAttribute('pointer-events', 'none');
+      tx.textContent = b.dec;
+      grp.appendChild(tx);
+    }
+    g.appendChild(grp);
+  });
+}
+
+function paintBeads() {
+  const ai = state.decade > 0 ? (state.decade - 1) * DSIZ + state.bead : -1;
+  BEADS.forEach(b => {
+    const grp = document.querySelector(`[data-i="${b.i}"]`);
+    if (!grp) return;
+    const c = grp.querySelector('circle');
+    const isActive = b.i === ai;
+    const isDone   = state.completedDecades.includes(b.dec);
+    if (isActive) {
+      c.setAttribute('fill', '#ffd700'); c.setAttribute('stroke', '#c8960c');
+      c.setAttribute('stroke-width', '3'); c.setAttribute('r', b.isOF ? 17 : 11);
+    } else if (isDone) {
+      c.setAttribute('fill', '#555'); c.setAttribute('stroke', '#444');
+      c.setAttribute('stroke-width', '1.5'); c.setAttribute('r', b.r);
+    } else {
+      c.setAttribute('fill', b.isOF ? '#5c2d1e' : '#8b6914');
+      c.setAttribute('stroke', '#3a2a0a'); c.setAttribute('stroke-width', '1.5');
+      c.setAttribute('r', b.r);
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  UI REFRESH
+// ═══════════════════════════════════════════════════════════
+function statusText() {
+  const s = state, m = {
+    IDLE:       t('idle'),
+    OUR_FATHER: t('our_father', {d:s.decade}),
+    HAIL_MARY:  t('hail_mary',  {d:s.decade, b:s.bead}),
+    GLORY_BE:   t('glory_be',   {d:s.decade}),
+    FATIMA:     t('fatima',     {d:s.decade}),
+    COMPLETE:   t('complete'),
+  };
+  return m[s.state] || t('idle');
+}
+
+function paintDecadeDots() {
+  for (let i = 1; i <= 5; i++) {
+    const el = document.getElementById(`d${i}`);
+    el.className = 'ddot';
+    if (state.completedDecades.includes(i)) el.classList.add('complete');
+    else if (state.decade === i)            el.classList.add('current');
+  }
+}
+
+function applyI18n() {
+  document.title                                      = t('title').replace('📿 ','');
+  document.documentElement.lang                       = lang;
+  document.getElementById('page-title').textContent   = t('title');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  document.getElementById('btn-da').classList.toggle('active', lang === 'da');
+  document.getElementById('interim-lbl').textContent  = t('interim_lbl');
+  document.getElementById('heard-lbl').textContent    = t('heard_lbl');
+  document.getElementById('btn-next').textContent     = t('next_bead');
+  document.getElementById('btn-undo').textContent     = t('undo');
+  document.getElementById('btn-reset').textContent    = t('reset');
+  document.getElementById('lg-cur').textContent       = t('lg_cur');
+  document.getElementById('lg-of').textContent        = t('lg_of');
+  document.getElementById('lg-hm').textContent        = t('lg_hm');
+  document.getElementById('lg-done').textContent      = t('lg_done');
+  updateMicUI();
+}
+
+function refresh() {
+  paintBeads();
+  paintDecadeDots();
+  document.getElementById('status-text').textContent = statusText();
+  // haptic (Android only — iOS ignores vibrate)
+  if (navigator.vibrate) navigator.vibrate(40);
+}
+
+function showHeard(text) {
+  document.getElementById('heard-val').textContent = text;
+}
+function showInterim(text) {
+  document.getElementById('interim-val').textContent = text;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LANGUAGE
+// ═══════════════════════════════════════════════════════════
+let lang = 'en';
+
+function setLang(l) {
+  lang = l;
+  applyI18n();
+  persist();
+  // restart recognition with correct language
+  if (micOn && recog) { recog.abort(); }
+}
+
+function nextBead() { advanceManual(); }
+
+// ═══════════════════════════════════════════════════════════
+//  WEB SPEECH API
+// ═══════════════════════════════════════════════════════════
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let micOn  = false;
+let recog  = null;
+let restartTimer = null;
+
+function speechSupported() { return !!SR; }
+
+function toggleMic() {
+  if (!speechSupported()) {
+    alert(t('mic_none'));
+    return;
+  }
+  micOn ? stopMic() : startMic();
+}
+
+function startMic() {
+  micOn = true;
+  updateMicUI();
+  startSession();
+}
+
+function stopMic() {
+  micOn = false;
+  clearTimeout(restartTimer);
+  showInterim('');
+  if (recog) { recog.abort(); recog = null; }
+  updateMicUI();
+}
+
+function startSession() {
+  if (!micOn || !SR) return;
+
+  const r = new SR();
+  r.lang           = lang === 'da' ? 'da-DK' : 'en-US';
+  r.continuous     = false;   // false = better iOS compatibility
+  r.interimResults = true;
+  r.maxAlternatives = 1;
+
+  r.onstart = () => {
+    document.getElementById('mic-btn').className   = 'listening';
+    document.getElementById('mic-label').className = 'listening';
+    document.getElementById('mic-label').textContent = t('mic_on');
+  };
+
+  r.onresult = e => {
+    const last    = e.results[e.results.length - 1];
+    const text    = last[0].transcript.trim();
+    const isFinal = last.isFinal;
+    showInterim(isFinal ? '' : text);
+    if (isFinal && text) {
+      showHeard(text);
+      showInterim('');
+      const prayer = detectPrayer(text, lang);
+      if (prayer) advance(prayer);
+    }
+  };
+
+  r.onspeechend = () => r.stop();
+
+  r.onerror = e => {
+    console.warn('SR error:', e.error);
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      micOn = false;
+      updateMicUI();
+      alert('Microphone access denied.\nGo to Settings → Safari → Microphone and allow this site.');
+    }
+    // no-speech, aborted, network → let onend restart
+  };
+
+  r.onend = () => {
+    showInterim('');
+    updateMicUI();
+    if (micOn) {
+      // 400 ms pause prevents tight restart loops; gives iOS time to settle
+      restartTimer = setTimeout(startSession, 400);
+    }
+  };
+
+  try {
+    r.start();
+    recog = r;
+  } catch (e) {
+    console.warn('SR start failed:', e);
+    restartTimer = setTimeout(startSession, 700);
+  }
+}
+
+function updateMicUI() {
+  const btn = document.getElementById('mic-btn');
+  const lbl = document.getElementById('mic-label');
+  if (!speechSupported()) {
+    btn.className = 'off';
+    lbl.textContent = t('mic_none');
+    lbl.className = '';
+    return;
+  }
+  if (micOn) {
+    btn.className = 'listening';
+    lbl.textContent = t('mic_on');
+    lbl.className = 'listening';
+  } else {
+    btn.className = '';
+    lbl.textContent = t('mic_tap');
+    lbl.className = '';
+  }
+}
+
+// Restart recognition when returning to the page (screen lock / tab switch)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && micOn && !recog) {
+    clearTimeout(restartTimer);
+    restartTimer = setTimeout(startSession, 500);
+  }
+});
+window.addEventListener('pageshow', e => {
+  if (e.persisted && micOn) {
+    clearTimeout(restartTimer);
+    restartTimer = setTimeout(startSession, 500);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+//  SERVICE WORKER REGISTRATION
+// ═══════════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════
+restore();    // load persisted state
+buildBeads(); // create SVG elements
+applyI18n();  // apply translations
+refresh();    // paint initial state
+</script>
+</body>
+</html>
